@@ -1,5 +1,5 @@
-@'
-# complianceops
+
+# Complianceops
 
 ComplianceOps is a policy-gated Kubernetes delivery platform: Terraform-provisioned
 AWS infrastructure, ArgoCD-driven GitOps delivery, and Kyverno/Vault-backed compliance
@@ -10,13 +10,12 @@ docs live here; application code lives in the four complianceops-* service repos
 
 Links for the 4 services:
 
-https://github.com/thechawla225/complianceops-gatewayservice
+1. Gateway Service : https://github.com/thechawla225/complianceops-gatewayservice
 
-https://github.com/thechawla225/complianceops-transactionservice
+2. Transaction Service : https://github.com/thechawla225/complianceops-transactionservice
 
-https://github.com/thechawla225/complianceops-screeningservice
+3. Screening Service : https://github.com/thechawla225/complianceops-screeningservice
 
-https://github.com/thechawla225/complianceops-notifierservice
+4. Notifier Service : https://github.com/thechawla225/complianceops-notifierservice
 
 
-'@ | Set-Content -Path README.md -Encoding utf8
