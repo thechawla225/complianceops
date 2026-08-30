@@ -5,7 +5,7 @@ ComplianceOps is a policy-gated Kubernetes delivery platform: Terraform-provisio
 AWS infrastructure, ArgoCD-driven GitOps delivery, and Kyverno/Vault-backed compliance
 guardrails for four independently deployed microservices. This repo is the hub —
 infrastructure, GitOps manifests, policies, observability config, and architecture
-docs live here; application code lives in the four complianceops-* service repos.
+docs live here; application code lives in the four complianceops-service repos.
 
 
 ## Links for the 4 services:
