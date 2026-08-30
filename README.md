@@ -8,7 +8,7 @@ infrastructure, GitOps manifests, policies, observability config, and architectu
 docs live here; application code lives in the four complianceops-* service repos.
 
 
-Links for the 4 services:
+## Links for the 4 services:
 
 1. Gateway Service : https://github.com/thechawla225/complianceops-gatewayservice
 
