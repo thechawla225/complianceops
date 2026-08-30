@@ -1,5 +1,5 @@
 
-# Complianceops
+# ComplianceOps
 
 ComplianceOps is a policy-gated Kubernetes delivery platform: Terraform-provisioned
 AWS infrastructure, ArgoCD-driven GitOps delivery, and Kyverno/Vault-backed compliance
