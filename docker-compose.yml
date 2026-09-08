@@ -1,0 +1,43 @@
+# Adding a Dockeer Compose file in order to test the services locally
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: complianceops
+      POSTGRES_PASSWORD: complianceops
+      POSTGRES_DB: complianceops
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U complianceops"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    # No `ports:` to the host — only the Transaction Service needs to
+    # reach Postgres, over the network Compose creates automatically.
+
+  transaction:
+    build:
+      context: ../complianceops-transaction
+    environment:
+      DATABASE_URL: postgresql+asyncpg://complianceops:complianceops@postgres:5432/complianceops
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+
+  gateway:
+    build:
+      context: ../complianceops-gateway
+    environment:
+      API_KEY: dev-secret-key
+      TRANSACTION_SERVICE_URL: http://transaction:8000
+    depends_on:
+      transaction:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
