@@ -18,7 +18,7 @@ services:
 
   transaction:
     build:
-      context: ../complianceops-transaction
+      context: ../complianceops-transactionservice
     environment:
       DATABASE_URL: postgresql+asyncpg://complianceops:complianceops@postgres:5432/complianceops
     depends_on:
@@ -29,7 +29,7 @@ services:
 
   gateway:
     build:
-      context: ../complianceops-gateway
+      context: ../complianceops-gatewayservice
     environment:
       API_KEY: dev-secret-key
       TRANSACTION_SERVICE_URL: http://transaction:8000
