@@ -19,3 +19,4 @@ docs live here; application code lives in the four complianceops-service repos.
 4. Notifier Service : https://github.com/thechawla225/complianceops-notifierservice
 
 
+verify-round-trip.ps1 -> this script validates the connection between gateway and the transaction service
