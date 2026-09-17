@@ -51,6 +51,7 @@ module "eks" {
 
   name = "complianceops-eks"
 
+  // Allow cluster access, but only to the admin
   endpoint_public_access                   = true
   enable_cluster_creator_admin_permissions = true
 
