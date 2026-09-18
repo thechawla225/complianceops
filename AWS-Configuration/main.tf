@@ -45,6 +45,15 @@ module "vpc" {
   single_nat_gateway = true
 }
 
+// Adding some logic so that I dont have to comment and uncomment eks_managed_node_groups in the module "eks" block 
+
+
+variable "create_node_group" {
+  type    = bool
+  default = true
+}
+
+
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 21.0"
@@ -58,7 +67,8 @@ module "eks" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
-  eks_managed_node_groups = {
+// Added logic to prevent repeated uncommenting and commenting
+  eks_managed_node_groups = var.create_node_group ? {
     default = {
       ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = ["t3.small"]
@@ -66,7 +76,7 @@ module "eks" {
       max_size       = 2
       desired_size   = 1
     }
-  }
+  } : null
 }
 
 
