@@ -1,11 +1,13 @@
-# Adding a Dockeer Compose file in order to test the services locally
+# Adding a Docker Compose file in order to test the services locally
+
+#moved the passwords to env file to prevent checkov errors
 services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: complianceops
-      POSTGRES_PASSWORD: complianceops
-      POSTGRES_DB: complianceops
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -13,14 +15,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    # No `ports:` to the host — only the Transaction Service needs to
-    # reach Postgres, over the network Compose creates automatically.
 
   transaction:
     build:
       context: ../complianceops-transactionservice
     environment:
-      DATABASE_URL: postgresql+asyncpg://complianceops:complianceops@postgres:5432/complianceops
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,7 +31,7 @@ services:
     build:
       context: ../complianceops-gatewayservice
     environment:
-      API_KEY: dev-secret-key
+      API_KEY: ${API_KEY}
       TRANSACTION_SERVICE_URL: http://transaction:8000
     depends_on:
       transaction:
