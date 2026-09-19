@@ -108,6 +108,12 @@ provider "aws" {
   region = "us-east-1"
 }
 
+resource "aws_kms_key" "terraform_state_replica" {
+  provider            = aws.replica
+  description         = "KMS key for encrypting the replicated Terraform state bucket"
+  enable_key_rotation = true
+}
+
 resource "aws_s3_bucket" "terraform_state_replica" {
   provider = aws.replica
   bucket   = "${var.bucket_name}-replica"
@@ -118,6 +124,18 @@ resource "aws_s3_bucket_versioning" "terraform_state_replica" {
   bucket   = aws_s3_bucket.terraform_state_replica.id
   versioning_configuration {
     status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state_replica" {
+  provider = aws.replica
+  bucket   = aws_s3_bucket.terraform_state_replica.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.terraform_state_replica.arn
+    }
+    bucket_key_enabled = true
   }
 }
 
@@ -156,6 +174,30 @@ data "aws_iam_policy_document" "replication" {
     actions   = ["s3:ReplicateObject", "s3:ReplicateDelete", "s3:ReplicateTags"]
     resources = ["${aws_s3_bucket.terraform_state_replica.arn}/*"]
   }
+
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = [aws_kms_key.terraform_state.arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "kms:ViaService"
+      values   = ["s3.us-west-2.amazonaws.com"]
+    }
+  }
+
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:Encrypt"]
+    resources = [aws_kms_key.terraform_state_replica.arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "kms:ViaService"
+      values   = ["s3.us-east-1.amazonaws.com"]
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "replication" {
@@ -165,7 +207,10 @@ resource "aws_iam_role_policy" "replication" {
 }
 
 resource "aws_s3_bucket_replication_configuration" "terraform-state" {
-  depends_on = [aws_s3_bucket_versioning.terraform-state] # replication requires source versioning to exist first
+  depends_on = [
+    aws_s3_bucket_versioning.terraform-state,
+    aws_s3_bucket_versioning.terraform_state_replica,
+  ]
 
   bucket = aws_s3_bucket.terraform-state.id
   role   = aws_iam_role.replication.arn
@@ -174,9 +219,19 @@ resource "aws_s3_bucket_replication_configuration" "terraform-state" {
     id     = "replicate-state"
     status = "Enabled"
 
+    source_selection_criteria {
+      sse_kms_encrypted_objects {
+        status = "Enabled"
+      }
+    }
+
     destination {
       bucket        = aws_s3_bucket.terraform_state_replica.arn
       storage_class = "STANDARD"
+
+      encryption_configuration {
+        replica_kms_key_id = aws_kms_key.terraform_state_replica.arn
+      }
     }
   }
 }
