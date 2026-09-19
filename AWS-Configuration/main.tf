@@ -18,6 +18,9 @@ resource "aws_s3_bucket_versioning" "terraform-state" {
 // Replacing the default S3 bucket encryption with KMS key as per checkov suggestion for policy compliance and security best practices
 data "aws_caller_identity" "current" {}
 
+# checkov:skip=CKV_AWS_356:KMS key policies always target "this key" via Resource="*" — that's the AWS-documented convention for key policies, not a wildcard across resources
+# checkov:skip=CKV_AWS_111:standard AWS-generated default key policy pattern (root grant); actual access is still gated by IAM policies attached elsewhere
+# checkov:skip=CKV_AWS_109:same as above
 data "aws_iam_policy_document" "kms_key_policy" {
   statement {
     sid       = "EnableRootAccountPermissions"
@@ -102,6 +105,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state_logs" {
 
     expiration {
       days = 365
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
     }
   }
 }
