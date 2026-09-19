@@ -18,10 +18,10 @@ resource "aws_s3_bucket_versioning" "terraform-state" {
 // Replacing the default S3 bucket encryption with KMS key as per checkov suggestion for policy compliance and security best practices
 data "aws_caller_identity" "current" {}
 
-# checkov:skip=CKV_AWS_356:KMS key policies always target "this key" via Resource="*" — that's the AWS-documented convention for key policies, not a wildcard across resources
-# checkov:skip=CKV_AWS_111:standard AWS-generated default key policy pattern (root grant); actual access is still gated by IAM policies attached elsewhere
-# checkov:skip=CKV_AWS_109:same as above
 data "aws_iam_policy_document" "kms_key_policy" {
+  #checkov:skip=CKV_AWS_356:KMS key policies always target "this key" via Resource="*" — the AWS-documented convention, not a wildcard across resources
+  #checkov:skip=CKV_AWS_111:standard AWS-generated default key policy pattern (root grant); actual access is still gated by IAM policies attached elsewhere
+  #checkov:skip=CKV_AWS_109:same as above
   statement {
     sid       = "EnableRootAccountPermissions"
     effect    = "Allow"
@@ -64,9 +64,9 @@ resource "aws_s3_bucket_public_access_block" "terraform-state" {
 // Enablding logs for S3 bucket as per checkov suggestion for policy compliance and security best practices
 
 
-# checkov:skip=CKV_AWS_18:log bucket — logging a log bucket to itself is circular
-# checkov:skip=CKV_AWS_144:log bucket does not need cross-region replication
 resource "aws_s3_bucket" "terraform_state_logs" {
+  #checkov:skip=CKV_AWS_18:log bucket — logging a log bucket to itself is circular
+  #checkov:skip=CKV_AWS_144:log bucket does not need cross-region replication
   bucket = "${var.bucket_name}-logs"
 }
 
@@ -183,8 +183,8 @@ resource "aws_kms_key" "terraform_state_replica" {
   policy              = data.aws_iam_policy_document.kms_key_policy.json
 }
 
-# checkov:skip=CKV_AWS_18:S3 access-logging target must be in the same region as the source bucket — a second regional log bucket isn't warranted just for the replication target
 resource "aws_s3_bucket" "terraform_state_replica" {
+  #checkov:skip=CKV_AWS_18:S3 access-logging target must be in the same region as the source bucket — a second regional log bucket isn't warranted just for the replication target
   provider = aws.replica
   bucket   = "${var.bucket_name}-replica"
 }
