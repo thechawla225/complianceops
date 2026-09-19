@@ -16,9 +16,26 @@ resource "aws_s3_bucket_versioning" "terraform-state" {
 }
 
 // Replacing the default S3 bucket encryption with KMS key as per checkov suggestion for policy compliance and security best practices
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "kms_key_policy" {
+  statement {
+    sid       = "EnableRootAccountPermissions"
+    effect    = "Allow"
+    actions   = ["kms:*"]
+    resources = ["*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
+}
+
 resource "aws_kms_key" "terraform_state" {
   description         = "KMS key for encrypting the Terraform state bucket"
   enable_key_rotation = true
+  policy              = data.aws_iam_policy_document.kms_key_policy.json
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform-state" {
@@ -44,8 +61,54 @@ resource "aws_s3_bucket_public_access_block" "terraform-state" {
 // Enablding logs for S3 bucket as per checkov suggestion for policy compliance and security best practices
 
 
+# checkov:skip=CKV_AWS_18:log bucket — logging a log bucket to itself is circular
+# checkov:skip=CKV_AWS_144:log bucket does not need cross-region replication
 resource "aws_s3_bucket" "terraform_state_logs" {
   bucket = "${var.bucket_name}-logs"
+}
+
+resource "aws_s3_bucket_versioning" "terraform_state_logs" {
+  bucket = aws_s3_bucket.terraform_state_logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state_logs" {
+  bucket = aws_s3_bucket.terraform_state_logs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.terraform_state.arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "terraform_state_logs" {
+  bucket                  = aws_s3_bucket.terraform_state_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "terraform_state_logs" {
+  bucket = aws_s3_bucket.terraform_state_logs.id
+
+  rule {
+    id     = "expire-old-logs"
+    status = "Enabled"
+
+    expiration {
+      days = 365
+    }
+  }
+}
+
+resource "aws_s3_bucket_notification" "terraform_state_logs" {
+  bucket      = aws_s3_bucket.terraform_state_logs.id
+  eventbridge = true
 }
 
 resource "aws_s3_bucket_logging" "terraform-state" {
@@ -54,8 +117,6 @@ resource "aws_s3_bucket_logging" "terraform-state" {
   target_bucket = aws_s3_bucket.terraform_state_logs.id
   target_prefix = "log/"
 }
-
-data "aws_caller_identity" "current" {}
 
 resource "aws_s3_bucket_policy" "terraform_state_logs" {
   bucket = aws_s3_bucket.terraform_state_logs.id
@@ -112,8 +173,10 @@ resource "aws_kms_key" "terraform_state_replica" {
   provider            = aws.replica
   description         = "KMS key for encrypting the replicated Terraform state bucket"
   enable_key_rotation = true
+  policy              = data.aws_iam_policy_document.kms_key_policy.json
 }
 
+# checkov:skip=CKV_AWS_18:S3 access-logging target must be in the same region as the source bucket — a second regional log bucket isn't warranted just for the replication target
 resource "aws_s3_bucket" "terraform_state_replica" {
   provider = aws.replica
   bucket   = "${var.bucket_name}-replica"
@@ -137,6 +200,39 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state_r
     }
     bucket_key_enabled = true
   }
+}
+
+resource "aws_s3_bucket_public_access_block" "terraform_state_replica" {
+  provider                = aws.replica
+  bucket                  = aws_s3_bucket.terraform_state_replica.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "terraform_state_replica" {
+  provider = aws.replica
+  bucket   = aws_s3_bucket.terraform_state_replica.id
+
+  rule {
+    id     = "expire-old-versions"
+    status = "Enabled"
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+resource "aws_s3_bucket_notification" "terraform_state_replica" {
+  provider    = aws.replica
+  bucket      = aws_s3_bucket.terraform_state_replica.id
+  eventbridge = true
 }
 
 data "aws_iam_policy_document" "replication_assume_role" {
@@ -266,8 +362,8 @@ variable "create_node_group" {
 
 
 module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 21.0"
+  // Added Source with commit hash as per checkov suggestion to prevent supply chain attack
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=d386adc021dc370efe1bceb7991fbed6e9787c84"
 
   name = "complianceops-eks"
 
