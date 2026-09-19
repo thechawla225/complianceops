@@ -2,6 +2,8 @@ provider "aws" {
   region = "us-west-2"
 }
 
+
+//-----------------------------------------------------S3 Configuration-----------------------------------------------------
 resource "aws_s3_bucket" "terraform-state" {
   bucket = var.bucket_name
 }
@@ -13,12 +15,20 @@ resource "aws_s3_bucket_versioning" "terraform-state" {
   }
 }
 
+// Replacing the default S3 bucket encryption with KMS key as per checkov suggestion for policy compliance and security best practices
+resource "aws_kms_key" "terraform_state" {
+  description         = "KMS key for encrypting the Terraform state bucket"
+  enable_key_rotation = true
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform-state" {
   bucket = aws_s3_bucket.terraform-state.id
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.terraform_state.arn
     }
+    bucket_key_enabled = true
   }
 }
 
@@ -28,11 +38,155 @@ resource "aws_s3_bucket_public_access_block" "terraform-state" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+
 }
 
+// Enablding logs for S3 bucket as per checkov suggestion for policy compliance and security best practices
+
+
+resource "aws_s3_bucket" "terraform_state_logs" {
+  bucket = "${var.bucket_name}-logs"
+}
+
+resource "aws_s3_bucket_logging" "terraform-state" {
+  bucket = aws_s3_bucket.terraform-state.id
+
+  target_bucket = aws_s3_bucket.terraform_state_logs.id
+  target_prefix = "log/"
+}
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_s3_bucket_policy" "terraform_state_logs" {
+  bucket = aws_s3_bucket.terraform_state_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "S3ServerAccessLogsPolicy"
+      Effect    = "Allow"
+      Principal = { Service = "logging.s3.amazonaws.com" }
+      Action    = "s3:PutObject"
+      Resource  = "${aws_s3_bucket.terraform_state_logs.arn}/log/*"
+      Condition = {
+        ArnLike      = { "aws:SourceArn" = aws_s3_bucket.terraform-state.arn }
+        StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.current.account_id }
+      }
+    }]
+  })
+}
+
+// Enabling event notifications for S3 bucket as per checkov suggestion for policy compliance and security best practices
+
+resource "aws_s3_bucket_notification" "terraform-state" {
+  bucket      = aws_s3_bucket.terraform-state.id
+  eventbridge = true
+}
+
+// Added lifecycle configuration for S3 bucket as per checkov suggestion for cost saving best practise
+resource "aws_s3_bucket_lifecycle_configuration" "terraform-state" {
+  bucket = aws_s3_bucket.terraform-state.id
+
+  rule {
+    id     = "expire-old-versions"
+    status = "Enabled"
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+// Cross Region replication for S3 bucket as per checkov suggestion for policy compliance and security best practices
+
+provider "aws" {
+  alias  = "replica"
+  region = "us-east-1"
+}
+
+resource "aws_s3_bucket" "terraform_state_replica" {
+  provider = aws.replica
+  bucket   = "${var.bucket_name}-replica"
+}
+
+resource "aws_s3_bucket_versioning" "terraform_state_replica" {
+  provider = aws.replica
+  bucket   = aws_s3_bucket.terraform_state_replica.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+data "aws_iam_policy_document" "replication_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+  }
+}
+
+// IAM roles added for checkov issue resolution 
+resource "aws_iam_role" "replication" {
+  name               = "complianceops-s3-replication-role"
+  assume_role_policy = data.aws_iam_policy_document.replication_assume_role.json
+}
+
+data "aws_iam_policy_document" "replication" {
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:GetReplicationConfiguration", "s3:ListBucket"]
+    resources = [aws_s3_bucket.terraform-state.arn]
+  }
+
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:GetObjectVersionForReplication", "s3:GetObjectVersionAcl", "s3:GetObjectVersionTagging"]
+    resources = ["${aws_s3_bucket.terraform-state.arn}/*"]
+  }
+
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:ReplicateObject", "s3:ReplicateDelete", "s3:ReplicateTags"]
+    resources = ["${aws_s3_bucket.terraform_state_replica.arn}/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "replication" {
+  name   = "complianceops-s3-replication-policy"
+  role   = aws_iam_role.replication.id
+  policy = data.aws_iam_policy_document.replication.json
+}
+
+resource "aws_s3_bucket_replication_configuration" "terraform-state" {
+  depends_on = [aws_s3_bucket_versioning.terraform-state] # replication requires source versioning to exist first
+
+  bucket = aws_s3_bucket.terraform-state.id
+  role   = aws_iam_role.replication.arn
+
+  rule {
+    id     = "replicate-state"
+    status = "Enabled"
+
+    destination {
+      bucket        = aws_s3_bucket.terraform_state_replica.arn
+      storage_class = "STANDARD"
+    }
+  }
+}
+
+
+// -----------------------------------------------------VPC Configuration-----------------------------------------------------
+
 module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 6.0"
+  // Added Source with commit hash as per checkov suggestion to prevent supply chain attack
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git?ref=b3abd6df2ecf052451a361ed55b8f06f8742a795"
 
   name = "complianceops-vpc"
   cidr = "10.0.0.0/16"
@@ -45,6 +199,8 @@ module "vpc" {
   single_nat_gateway = true
 }
 
+
+// -----------------------------------------------------EKS Configuration-----------------------------------------------------
 // Adding some logic so that I dont have to comment and uncomment eks_managed_node_groups in the module "eks" block 
 
 
@@ -79,6 +235,8 @@ module "eks" {
   } : null
 }
 
+
+// -----------------------------------------------------ECR Configuration-----------------------------------------------------
 
 locals {
   services = ["gateway", "transaction", "screening", "notifier"]
