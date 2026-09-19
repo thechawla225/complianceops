@@ -67,7 +67,7 @@ module "eks" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
-// Added logic to prevent repeated uncommenting and commenting
+  // Added logic to prevent repeated uncommenting and commenting
   eks_managed_node_groups = var.create_node_group ? {
     default = {
       ami_type       = "AL2023_x86_64_STANDARD"
@@ -93,6 +93,10 @@ resource "aws_ecr_repository" "services" {
 
   image_scanning_configuration {
     scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "KMS"
   }
 }
 

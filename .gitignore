@@ -20,3 +20,7 @@ override.tf.json
 
 .terraformrc
 terraform.rc
+
+# adding to gitignore the aws installation for wsl
+
+**/.aws/*
