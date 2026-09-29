@@ -372,7 +372,7 @@ module "eks" {
   // Added Source with commit hash as per checkov suggestion to prevent supply chain attack
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=d386adc021dc370efe1bceb7991fbed6e9787c84"
 
-  kubernetes_version = "1.31"
+  kubernetes_version = "1.35"
 
   name = "complianceops-eks"
 
@@ -383,6 +383,17 @@ module "eks" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
+  addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
+  }
   // Added logic to prevent repeated uncommenting and commenting
   eks_managed_node_groups = var.create_node_group ? {
     default = {
