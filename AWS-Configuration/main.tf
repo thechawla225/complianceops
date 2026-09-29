@@ -372,6 +372,8 @@ module "eks" {
   // Added Source with commit hash as per checkov suggestion to prevent supply chain attack
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=d386adc021dc370efe1bceb7991fbed6e9787c84"
 
+  kubernetes_version = "1.31"
+
   name = "complianceops-eks"
 
   // Allow cluster access, but only to the admin
@@ -389,6 +391,10 @@ module "eks" {
       min_size       = 1
       max_size       = 2
       desired_size   = 1
+
+      iam_role_additional_policies = {
+        AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      }
     }
   } : null
 }
