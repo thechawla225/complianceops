@@ -384,16 +384,15 @@ module "eks" {
   subnet_ids = module.vpc.private_subnets
 
   addons = {
-    coredns = {
-      most_recent = true
-    }
-    kube-proxy = {
-      most_recent = true
-    }
-    vpc-cni = {
-      most_recent = true
+    coredns    = { most_recent = true }
+    kube-proxy = { most_recent = true }
+    vpc-cni    = { most_recent = true }
+    aws-ebs-csi-driver = {
+      most_recent              = true
+      service_account_role_arn = aws_iam_role.ebs_csi.arn
     }
   }
+
   // Added logic to prevent repeated uncommenting and commenting
   eks_managed_node_groups = var.create_node_group ? {
     default = {
@@ -410,6 +409,93 @@ module "eks" {
   } : null
 }
 
+data "aws_eks_cluster_auth" "this" {
+  name = module.eks.cluster_name
+}
+
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.this.token
+}
+
+resource "kubernetes_namespace" "sanctions_platform" {
+  metadata {
+    name = "sanctions-platform"
+  }
+}
+
+resource "kubernetes_service_account" "sanctions_platform_sa" {
+  metadata {
+    name      = "sanctions-platform-sa"
+    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
+  }
+}
+
+resource "kubernetes_role" "sanctions_platform_dev" {
+  metadata {
+    name      = "sanctions-platform-dev"
+    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
+  }
+  rule {
+    api_groups = ["", "apps"]
+    resources  = ["pods", "deployments", "services", "configmaps", "pods/log"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
+  }
+}
+
+resource "kubernetes_role_binding" "sanctions_platform_dev" {
+  metadata {
+    name      = "sanctions-platform-dev-binding"
+    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Role"
+    name      = kubernetes_role.sanctions_platform_dev.metadata[0].name
+  }
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.sanctions_platform_sa.metadata[0].name
+    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
+  }
+}
+
+resource "kubernetes_resource_quota" "sanctions_platform" {
+  metadata {
+    name      = "sanctions-platform-quota"
+    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
+  }
+  spec {
+    hard = {
+      "requests.cpu"    = "4"
+      "requests.memory" = "8Gi"
+      "limits.cpu"      = "8"
+      "limits.memory"   = "16Gi"
+      "pods"            = "20"
+    }
+  }
+}
+
+resource "kubernetes_limit_range" "sanctions_platform" {
+  metadata {
+    name      = "sanctions-platform-limits"
+    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
+  }
+  spec {
+    limit {
+      type = "Container"
+      default = {
+        cpu    = "250m"
+        memory = "256Mi"
+      }
+      default_request = {
+        cpu    = "100m"
+        memory = "128Mi"
+      }
+    }
+  }
+}
 
 // -----------------------------------------------------ECR Configuration-----------------------------------------------------
 
