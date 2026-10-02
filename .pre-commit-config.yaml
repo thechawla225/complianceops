@@ -6,3 +6,34 @@ repos:
       - id: terraform_validate
       - id: terraform_tflint
       - id: terraform_checkov
+
+  - repo: local
+    hooks:
+      - id: helm-lint
+        name: helm lint (all charts, against values-dev.yaml)
+        language: system
+        files: ^gitops/.*\.(ya?ml|tpl)$
+        pass_filenames: false
+        entry: >-
+          bash -c '
+          set -e;
+          for d in gitops/*/; do
+            [ -f "$d/Chart.yaml" ] || continue;
+            echo "linting $d";
+            helm lint "$d" -f "$d/values-dev.yaml";
+          done'
+
+      - id: helm-template-kubeconform
+        name: helm template | kubeconform (schema validation)
+        language: system
+        files: ^gitops/.*\.(ya?ml|tpl)$
+        pass_filenames: false
+        entry: >-
+          bash -c '
+          set -e;
+          for d in gitops/*/; do
+            [ -f "$d/Chart.yaml" ] || continue;
+            echo "validating $d";
+            helm template "$d" -f "$d/values-dev.yaml" \
+              | kubeconform -strict -summary -kubernetes-version 1.35.0 -;
+          done'
