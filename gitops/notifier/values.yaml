@@ -9,7 +9,7 @@ image:
   pullPolicy: IfNotPresent
 
 namespace: sanctions-platform
-serviceAccountName: sanctions-platform-sa
+serviceAccountName: notifier-sa
 
 
 healthPort: 8000

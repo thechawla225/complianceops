@@ -7,7 +7,7 @@ image:
 
 
 namespace: sanctions-platform
-serviceAccountName: sanctions-platform-sa
+serviceAccountName: transaction-sa
 
 service:
   type: ClusterIP

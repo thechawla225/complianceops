@@ -4,7 +4,7 @@ image:
   tag: "dev-latest"
 
 env:
-  SQS_QUEUE_URL: ""           
+  SQS_QUEUE_URL: "https://sqs.us-west-2.amazonaws.com/697961193772/complianceops-flagged-transactions"           
   SLACK_WEBHOOK_URL: ""       
   AWS_REGION: "us-west-2"
   LOG_LEVEL: "debug"
