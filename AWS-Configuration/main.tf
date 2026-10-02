@@ -553,3 +553,117 @@ resource "aws_iam_role_policy_attachment" "ebs_csi" {
   role       = aws_iam_role.ebs_csi.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }
+
+
+// -----------------------------------------------------SQS Configuration-----------------------------------------------------
+
+resource "aws_sqs_queue" "flagged_transactions_dlq" {
+  name                      = "complianceops-flagged-transactions-dlq"
+  message_retention_seconds = 1209600 # 14 days
+  sqs_managed_sse_enabled   = true
+}
+
+resource "aws_sqs_queue" "flagged_transactions" {
+  name                       = "complianceops-flagged-transactions"
+  visibility_timeout_seconds = 30
+  sqs_managed_sse_enabled    = true
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.flagged_transactions_dlq.arn
+    maxReceiveCount     = 5
+  })
+}
+
+// dedicated service accounts
+// IRSA can scope send vs receive separately
+resource "kubernetes_service_account" "transaction_sa" {
+  metadata {
+    name      = "transaction-sa"
+    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.transaction_sqs.arn
+    }
+  }
+}
+
+resource "kubernetes_service_account" "notifier_sa" {
+  metadata {
+    name      = "notifier-sa"
+    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.notifier_sqs.arn
+    }
+  }
+}
+
+// --- transaction: send only ---
+data "aws_iam_policy_document" "transaction_sqs_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${module.eks.oidc_provider}:sub"
+      values   = ["system:serviceaccount:sanctions-platform:transaction-sa"]
+    }
+  }
+}
+
+resource "aws_iam_role" "transaction_sqs" {
+  name               = "complianceops-transaction-sqs-role"
+  assume_role_policy = data.aws_iam_policy_document.transaction_sqs_assume_role.json
+}
+
+data "aws_iam_policy_document" "transaction_sqs" {
+  statement {
+    effect    = "Allow"
+    actions   = ["sqs:SendMessage", "sqs:GetQueueAttributes"]
+    resources = [aws_sqs_queue.flagged_transactions.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "transaction_sqs" {
+  name   = "complianceops-transaction-sqs-policy"
+  role   = aws_iam_role.transaction_sqs.id
+  policy = data.aws_iam_policy_document.transaction_sqs.json
+}
+
+// --- notifier: receive/delete only ---
+data "aws_iam_policy_document" "notifier_sqs_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${module.eks.oidc_provider}:sub"
+      values   = ["system:serviceaccount:sanctions-platform:notifier-sa"]
+    }
+  }
+}
+
+resource "aws_iam_role" "notifier_sqs" {
+  name               = "complianceops-notifier-sqs-role"
+  assume_role_policy = data.aws_iam_policy_document.notifier_sqs_assume_role.json
+}
+
+data "aws_iam_policy_document" "notifier_sqs" {
+  statement {
+    effect    = "Allow"
+    actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+    resources = [aws_sqs_queue.flagged_transactions.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "notifier_sqs" {
+  name   = "complianceops-notifier-sqs-policy"
+  role   = aws_iam_role.notifier_sqs.id
+  policy = data.aws_iam_policy_document.notifier_sqs.json
+}
