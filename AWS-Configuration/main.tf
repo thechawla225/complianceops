@@ -387,11 +387,9 @@ module "eks" {
     coredns    = { most_recent = true }
     kube-proxy = { most_recent = true }
     vpc-cni    = { most_recent = true }
-    aws-ebs-csi-driver = {
-      most_recent              = true
-      service_account_role_arn = aws_iam_role.ebs_csi.arn
-    }
   }
+
+
 
   // Added logic to prevent repeated uncommenting and commenting
   eks_managed_node_groups = var.create_node_group ? {
@@ -407,6 +405,13 @@ module "eks" {
       }
     }
   } : null
+}
+
+resource "aws_eks_addon" "ebs_csi" {
+  cluster_name             = module.eks.cluster_name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.ebs_csi.arn
+
 }
 
 data "aws_eks_cluster_auth" "this" {
