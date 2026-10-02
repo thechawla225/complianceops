@@ -1,0 +1,11 @@
+apiVersion: v2
+name: gateway
+description: ComplianceOps API Gateway 
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - complianceops
+  - gateway
+maintainers:
+  - name: Ankit

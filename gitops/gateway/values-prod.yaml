@@ -1,0 +1,19 @@
+replicaCount: 3
+
+image:
+  tag: "CHANGEME-git-sha"
+
+env:
+  TRANSACTION_SERVICE_URL: "http://transaction.sanctions-platform.svc.cluster.local:8001"
+  LOG_LEVEL: "warn"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+podAnnotations:
+  compliance.complianceops.io/audited: "true"
