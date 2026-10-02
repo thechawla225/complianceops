@@ -1,0 +1,11 @@
+apiVersion: v2
+name: screening
+description: ComplianceOps Screening Service (Go) 
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - complianceops
+  - screening
+maintainers:
+  - name: Ankit

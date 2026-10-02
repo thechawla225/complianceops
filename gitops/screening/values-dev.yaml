@@ -1,0 +1,17 @@
+replicaCount: 1
+
+image:
+  tag: "dev-latest"
+
+env:
+  REDIS_HOST: "redis.sanctions-platform.svc.cluster.local"
+  REDIS_PORT: "6379"
+  LOG_LEVEL: "debug"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

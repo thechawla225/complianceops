@@ -1,0 +1,21 @@
+replicaCount: 3
+
+image:
+  tag: "CHANGEME-git-sha"
+
+env:
+  SCREENING_SERVICE_URL: "http://screening.sanctions-platform.svc.cluster.local:8080"
+  DATABASE_URL: ""
+  SQS_QUEUE_URL: ""
+  LOG_LEVEL: "warn"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+podAnnotations:
+  compliance.complianceops.io/audited: "true"

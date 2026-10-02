@@ -1,0 +1,9 @@
+apiVersion: v2
+name: transaction
+description: ComplianceOps Transaction Service 
+appVersion: "0.1.0"
+keywords:
+  - complianceops
+  - transaction
+maintainers:
+  - name: Ankit

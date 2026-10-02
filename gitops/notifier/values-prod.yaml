@@ -1,0 +1,21 @@
+replicaCount: 2
+
+image:
+  tag: "CHANGEME-git-sha"
+
+env:
+  SQS_QUEUE_URL: ""
+  SLACK_WEBHOOK_URL: ""
+  AWS_REGION: "us-west-2"
+  LOG_LEVEL: "warn"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+podAnnotations:
+  compliance.complianceops.io/audited: "true"

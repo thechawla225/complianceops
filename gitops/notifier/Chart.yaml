@@ -1,0 +1,10 @@
+apiVersion: v2
+name: notifier
+description: ComplianceOps Notifier Service (Node/Express)
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - complianceops
+  - notifier
+maintainers:
+  - name: Ankit
