@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-notifier
+  namespace: sanctions-platform
+spec:
+  serviceAccountName: notifier-sa
+  containers:
+    - name: debug
+      image: node:20-slim
+      command: ["sleep", "3600"]
