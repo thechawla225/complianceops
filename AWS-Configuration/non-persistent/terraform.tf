@@ -12,5 +12,9 @@ terraform {
 
   required_version = ">= 1.11.0"
 
-  backend "s3" {}
+  backend "s3" {
+    bucket = "complianceops-terraform-state"
+    key    = "non-persistent/terraform.tfstate"
+    region = "us-west-2"
+  }
 }
