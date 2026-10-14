@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  tag: "dev-latest"
+  tag: "6bf44c1"  # complianceops-screeningservice commit
 
 env:
   REDIS_HOST: "redis.sanctions-platform.svc.cluster.local"
