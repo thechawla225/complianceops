@@ -12,7 +12,11 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 }
 
 locals {
-  github_repo = "thechawla225/complianceops"
+  // This repo has GitHub's immutable OIDC subject enabled, so the token's sub is
+  // "repo:<owner>@<owner_id>/<repo>@<repo_id>:..." not "repo:<owner>/<repo>:...".
+  // IDs can't be reused if the repo/user is renamed or deleted (name-squatting safe).
+  // Check with: gh api repos/thechawla225/complianceops/actions/oidc/customization/sub
+  github_repo = "thechawla225@45570514/complianceops@1351611018"
 }
 
 data "aws_iam_policy_document" "github_actions_assume_role" {
