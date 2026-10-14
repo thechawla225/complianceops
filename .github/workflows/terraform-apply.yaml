@@ -98,3 +98,68 @@ jobs:
       - name: terraform apply
         if: github.event_name == 'workflow_dispatch' && inputs.apply_non_persistent
         run: terraform apply -auto-approve -var="create_node_group=true"
+
+      # Post-apply smoke test: green run = cluster is actually usable, so no
+      # local kubectl checks are needed before starting work.
+      - name: verify cluster
+        if: github.event_name == 'workflow_dispatch' && inputs.apply_non_persistent
+        shell: bash
+        env:
+          CLUSTER: complianceops-eks
+          # Same as var.admin_user_arn in non-persistent/main.tf
+          ADMIN_USER_ARN: arn:aws:iam::697961193772:user/Ankit-CLI
+        run: |
+          aws eks update-kubeconfig --name "$CLUSTER" --region "$AWS_REGION"
+          kubectl version --client
+
+          echo "::group::EKS add-ons ACTIVE"
+          for addon in vpc-cni kube-proxy coredns aws-ebs-csi-driver; do
+            aws eks wait addon-active --cluster-name "$CLUSTER" --addon-name "$addon"
+            echo "$addon: ACTIVE"
+          done
+          echo "::endgroup::"
+
+          echo "::group::Nodes Ready"
+          kubectl wait --for=condition=Ready nodes --all --timeout=5m
+          kubectl get nodes -o wide
+          echo "::endgroup::"
+
+          echo "::group::System workloads rolled out"
+          for ds in aws-node kube-proxy ebs-csi-node; do
+            kubectl -n kube-system rollout status daemonset/$ds --timeout=5m
+          done
+          for deploy in coredns ebs-csi-controller; do
+            kubectl -n kube-system rollout status deployment/$deploy --timeout=5m
+          done
+          echo "::endgroup::"
+
+          echo "::group::DNS + NAT egress (pulls an image from Docker Hub, resolves a service name)"
+          kubectl run verify-dns --image=busybox:1.36 --restart=Never --rm -i \
+            --pod-running-timeout=3m -- nslookup kubernetes.default.svc.cluster.local
+          echo "::endgroup::"
+
+          echo "::group::App namespace, service accounts, IRSA annotations"
+          kubectl get namespace sanctions-platform
+          for sa in transaction-sa notifier-sa; do
+            role=$(kubectl -n sanctions-platform get sa "$sa" -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}')
+            [[ "$role" == arn:aws:iam::* ]] || { echo "::error::$sa has no IRSA role annotation"; exit 1; }
+            echo "$sa -> $role"
+          done
+          echo "::endgroup::"
+
+          echo "::group::Local kubectl access (Ankit-CLI access entry)"
+          aws eks list-associated-access-policies --cluster-name "$CLUSTER" --principal-arn "$ADMIN_USER_ARN" \
+            --query 'associatedAccessPolicies[].policyArn' --output text | grep -q AmazonEKSClusterAdminPolicy \
+            || { echo "::error::$ADMIN_USER_ARN has no cluster-admin access policy"; exit 1; }
+          echo "Ankit-CLI has AmazonEKSClusterAdminPolicy"
+          echo "::endgroup::"
+
+          {
+            echo "## Cluster ready ✅"
+            echo '```'
+            kubectl get nodes
+            echo
+            kubectl get pods -n kube-system
+            echo '```'
+            echo "Connect locally: \`aws eks update-kubeconfig --name $CLUSTER --region $AWS_REGION\`"
+          } >> "$GITHUB_STEP_SUMMARY"
