@@ -29,3 +29,6 @@ terraform.rc
 # non-persistent/). Its lock file only appears if terraform is run there by mistake.
 # The lock files INSIDE persistent/ and non-persistent/ must stay committed.
 /AWS-Configuration/.terraform.lock.hcl
+
+# Local secrets: never commit (compose reads .env from disk)
+.env
