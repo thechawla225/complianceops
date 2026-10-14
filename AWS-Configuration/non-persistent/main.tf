@@ -32,6 +32,17 @@ variable "create_node_group" {
   default = true
 }
 
+variable "admin_user_arn" {
+  description = "IAM user that gets cluster-admin for local kubectl / apply.ps1 / teardown.ps1"
+  type        = string
+  default     = "arn:aws:iam::697961193772:user/Ankit-CLI"
+}
+
+// Looked up by name (like the SQS queue) so this state stays decoupled from persistent's state
+data "aws_iam_role" "github_actions_ci" {
+  name = "complianceops-github-actions-ci"
+}
+
 module "eks" {
   // Added Source with commit hash as per checkov suggestion to prevent supply chain attack
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=d386adc021dc370efe1bceb7991fbed6e9787c84"
@@ -41,8 +52,33 @@ module "eks" {
   name = "complianceops-eks"
 
   // Allow cluster access, but only to the admin
-  endpoint_public_access                   = true
-  enable_cluster_creator_admin_permissions = true
+  endpoint_public_access = true
+
+  // Creator-only admin breaks as soon as two identities apply this config:
+  // whoever didn't create the cluster (local user vs CI role) gets Unauthorized
+  // on every kubernetes_* resource. Grant both explicitly instead.
+  enable_cluster_creator_admin_permissions = false
+
+  access_entries = {
+    admin_user = {
+      principal_arn = var.admin_user_arn
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+    github_actions_ci = {
+      principal_arn = data.aws_iam_role.github_actions_ci.arn
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+  }
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets

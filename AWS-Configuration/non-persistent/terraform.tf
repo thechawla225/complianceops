@@ -16,5 +16,8 @@ terraform {
     bucket = "complianceops-terraform-state"
     key    = "non-persistent/terraform.tfstate"
     region = "us-west-2"
+    // Lock the state so a local apply/teardown and a CI run can't write it at the same time
+    encrypt      = true
+    use_lockfile = true
   }
 }

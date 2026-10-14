@@ -1,0 +1,75 @@
+name: Terraform Destroy
+
+# Manual only (Actions tab -> Terraform Destroy -> Run workflow).
+# Only ever destroys non-persistent (VPC, EKS, nodes, IRSA, namespace).
+# persistent (state bucket, ECR images, SQS, CI role) is never touched —
+# same rule as teardown.ps1, and the reason the states were split.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm tearing down non-persistent (VPC + EKS)'
+        type: string
+        required: true
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+# Same group as terraform-apply.yaml, so an apply and a destroy can never
+# run against the same state at the same time.
+concurrency:
+  group: terraform-complianceops
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-2
+  TF_VERSION: "1.16.2"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  non-persistent:
+    name: destroy non-persistent (VPC, EKS, IRSA, namespace)
+    if: inputs.confirm == 'destroy'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: AWS-Configuration/non-persistent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - run: terraform init
+
+      - name: terraform plan -destroy
+        run: terraform plan -destroy -var="create_node_group=true"
+
+      # The EKS token used by the kubernetes provider lives ~15 min and can
+      # expire mid-destroy ("Error: Unauthorized"). A second run mints a fresh
+      # token and carries on from where the first stopped.
+      - name: terraform destroy
+        run: |
+          terraform destroy -auto-approve -var="create_node_group=true" && exit 0
+          echo "::warning::First destroy attempt failed — retrying with a fresh EKS token"
+          terraform destroy -auto-approve -var="create_node_group=true"
+
+  rejected:
+    name: confirmation missing
+    if: inputs.confirm != 'destroy'
+    runs-on: ubuntu-latest
+    steps:
+      # Input goes through env, not ${{ }} inside the script, to avoid shell injection
+      - env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          echo "::error::Confirmation input was '$CONFIRM', expected 'destroy'. Nothing was destroyed."
+          exit 1
