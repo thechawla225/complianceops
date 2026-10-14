@@ -8,10 +8,7 @@ terraform apply -auto-approve
 Set-Location (Join-Path $PSScriptRoot "non-persistent")
 terraform init -input=false
 
-# Run first before prompting creation of the eks_node_group
-terraform apply -var="create_node_group=false" -auto-approve
-
-# Run by creation of the eks_node_group
+# Single apply: addon ordering (before_compute / depends_on) lives in main.tf now
 terraform apply -var="create_node_group=true" -auto-approve
 
 Set-Location $PSScriptRoot

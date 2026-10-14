@@ -92,12 +92,9 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || !inputs.apply_non_persistent
         run: terraform plan -var="create_node_group=true"
 
-      # Two-phase apply: cluster/addons first, node group second — same
-      # reason as apply.ps1 (avoids the addon-before-nodes race).
-      - name: terraform apply (control plane + addons)
-        if: github.event_name == 'workflow_dispatch' && inputs.apply_non_persistent
-        run: terraform apply -auto-approve -var="create_node_group=false"
-
-      - name: terraform apply (node group)
+      # Single apply: addon ordering is handled in main.tf (vpc-cni/kube-proxy
+      # before_compute, coredns + ebs-csi after the node group). The old
+      # two-phase apply created coredns/ebs-csi with no nodes -> DEGRADED -> 20m timeout.
+      - name: terraform apply
         if: github.event_name == 'workflow_dispatch' && inputs.apply_non_persistent
         run: terraform apply -auto-approve -var="create_node_group=true"

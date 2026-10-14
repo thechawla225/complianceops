@@ -84,9 +84,11 @@ module "eks" {
   subnet_ids = module.vpc.private_subnets
 
   addons = {
-    coredns    = { most_recent = true }
-    kube-proxy = { most_recent = true }
-    vpc-cni    = { most_recent = true }
+    coredns = { most_recent = true }
+    // before_compute = installed before the node group, so nodes join with networking ready.
+    // coredns has no flag, so the module creates it after the node group (it needs nodes to run on).
+    kube-proxy = { most_recent = true, before_compute = true }
+    vpc-cni    = { most_recent = true, before_compute = true }
   }
 
   // Added logic to prevent repeated uncommenting and commenting
@@ -149,6 +151,9 @@ resource "aws_eks_addon" "ebs_csi" {
   cluster_name             = module.eks.cluster_name
   addon_name               = "aws-ebs-csi-driver"
   service_account_role_arn = aws_iam_role.ebs_csi.arn
+
+  // Controller pods need nodes; without this it goes DEGRADED and times out after 20m
+  depends_on = [module.eks]
 }
 
 // -----------------------------------------------------Namespace / RBAC / Quotas-----------------------------------------------------
