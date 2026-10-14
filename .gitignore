@@ -24,3 +24,8 @@ terraform.rc
 # adding to gitignore the aws installation for wsl
 
 **/aws/*    
+
+# Root AWS-Configuration is no longer a Terraform root (split into persistent/ and
+# non-persistent/). Its lock file only appears if terraform is run there by mistake.
+# The lock files INSIDE persistent/ and non-persistent/ must stay committed.
+/AWS-Configuration/.terraform.lock.hcl
