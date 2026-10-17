@@ -79,7 +79,7 @@ jobs:
         if: env.EXISTS == 'false'
         run: docker push "$IMAGE"
 
-      - uses: sigstore/cosign-installer@v4
+      - uses: sigstore/cosign-installer@v4.1.2   # no floating v4 tag is published; pin the exact release
         if: env.EXISTS == 'false'
 
       - name: cosign sign (keyless, signed with this workflow's GitHub OIDC identity)
