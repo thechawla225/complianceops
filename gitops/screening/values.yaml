@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 697961193772.dkr.ecr.us-west-2.amazonaws.com/complianceops-screening
-  tag: ""  
+  tag: ""
   pullPolicy: IfNotPresent
 
 namespace: sanctions-platform
@@ -10,7 +10,7 @@ serviceAccountName: sanctions-platform-sa
 
 service:
   type: ClusterIP
-  port: 8080   
+  port: 8080
 
 
 resources:

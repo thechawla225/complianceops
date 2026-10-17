@@ -5,7 +5,7 @@ replicaCount: 1
 
 image:
   repository: 697961193772.dkr.ecr.us-west-2.amazonaws.com/complianceops-notifier
-  tag: "" 
+  tag: ""
   pullPolicy: IfNotPresent
 
 namespace: sanctions-platform
