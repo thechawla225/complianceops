@@ -1,0 +1,17 @@
+# Checkov config, used by the terraform_checkov pre-commit hook (locally and in CI).
+# Every skip here is an accepted decision with its reason. Real findings get fixed, not listed.
+skip-check:
+  # Images are pinned by immutable commit-SHA tags in IMMUTABLE ECR repos, and signed by digest
+  # (ADR 0006, 0012). Kyverno will verify the signature at admission (Phase 07).
+  - CKV_K8S_43   # Image should use digest
+  # With immutable tags the cached image can't differ from the registry, so IfNotPresent is safe.
+  - CKV_K8S_15   # Image Pull Policy should be Always
+  # The tag is blank in values.yaml on purpose: each environment sets it (values-dev.yaml, bumped by CI).
+  # Checkov renders charts with values.yaml only, so it always sees the blank default.
+  - CKV_K8S_14   # Image Tag should be fixed - not latest or blank
+  # NetworkPolicies are managed in Terraform (k8s-network-policies.tf, moving into non-persistent in
+  # Phase B), not in the charts, so Checkov's chart scan can't see them.
+  - CKV2_K8S_6   # Pods should have an associated NetworkPolicy
+  # The workflow_dispatch inputs are deliberate safety controls (apply checkbox, typed "destroy"
+  # confirmation), passed via env: to prevent injection. They don't feed a build.
+  - CKV_GHA_7    # workflow_dispatch inputs must be empty

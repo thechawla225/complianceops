@@ -10,6 +10,8 @@ image:
 
 namespace: sanctions-platform
 serviceAccountName: notifier-sa
+# IRSA still works: the EKS webhook mounts its own aws-iam-token volume (CKV_K8S_38)
+automountServiceAccountToken: false
 
 
 healthPort: 8000
@@ -24,7 +26,7 @@ resources:
 
 securityContext:
   runAsNonRoot: true
-  runAsUser: 1000
+  runAsUser: 10001   # high UID: no overlap with host users (CKV_K8S_40)
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
@@ -32,7 +34,9 @@ securityContext:
       - ALL
 
 podSecurityContext:
-  fsGroup: 1000
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault   # CKV_K8S_31
 
 livenessProbe:
   httpGet:
