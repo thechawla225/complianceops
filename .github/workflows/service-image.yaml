@@ -22,7 +22,7 @@ permissions:
 env:
   AWS_REGION: us-west-2
   ROLE_ARN: arn:aws:iam::697961193772:role/complianceops-service-image-ci
-  TRIVY_VERSION: "0.76.0"
+  TRIVY_VERSION: "0.76.0" # WE are using Trivy for our image scanning
 
 jobs:
   image:
