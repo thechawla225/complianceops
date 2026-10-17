@@ -16,6 +16,14 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
 
+  # Lints .github/workflows/*: expression typos, invalid keys, bad needs/refs,
+  # and the shell inside run: blocks (via shellcheck, if it's on PATH).
+  # Built from Go source by pre-commit, so needs Go installed (no Docker).
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
   # Blocks commits containing secrets (keys, tokens, passwords)
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1

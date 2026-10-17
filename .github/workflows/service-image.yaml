@@ -106,11 +106,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "deploy($SERVICE): dev -> $TAG"
           # other services may have bumped their own file meanwhile; rebase and retry
-          for i in 1 2 3; do git pull --rebase -q && git push -q && exit 0; sleep 5; done
+          for _ in 1 2 3; do git pull --rebase -q && git push -q && exit 0; sleep 5; done
           echo "::error::could not push tag bump to complianceops"; exit 1
 
       - name: summary
         run: |
-          echo "## complianceops-$SERVICE:$TAG" >> "$GITHUB_STEP_SUMMARY"
-          echo "Image: \`$IMAGE\` (built: $([ "$EXISTS" = false ] && echo yes || echo 'no, already in ECR'))" >> "$GITHUB_STEP_SUMMARY"
-          echo "Deployed tag in \`gitops/$SERVICE/values-dev.yaml\`: \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## complianceops-$SERVICE:$TAG"
+            echo "Image: \`$IMAGE\` (built: $([ "$EXISTS" = false ] && echo yes || echo 'no, already in ECR'))"
+            echo "Deployed tag in \`gitops/$SERVICE/values-dev.yaml\`: \`$TAG\`"
+          } >> "$GITHUB_STEP_SUMMARY"
