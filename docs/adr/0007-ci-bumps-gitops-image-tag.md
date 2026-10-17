@@ -1,6 +1,6 @@
 # 0007. CI bumps the image tag in Git instead of Argo CD Image Updater
 
-- **Status:** Accepted (implementation in progress)
+- **Status:** Accepted (implemented 2026-10-17: all 4 service pipelines commit `deploy(<service>): dev -> <sha>`)
 - **Date:** 2026-10-14
 
 ## Context
