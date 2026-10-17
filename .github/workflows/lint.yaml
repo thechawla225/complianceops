@@ -1,0 +1,40 @@
+name: Lint
+
+# Runs every pre-commit hook on every PR and push to main. Local hooks can be skipped
+# (--no-verify, or never running `pre-commit install`); this is the gate that can't.
+# Required status check on main ("pre-commit"), so it must run on every PR: no path filters.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}   # tflint --init downloads its AWS plugin from GitHub
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      # Tools the system/terraform hooks call; versions match the local machine
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.16.2"
+          terraform_wrapper: false
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.64.0
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.0
+      - name: install pre-commit, checkov, kubeconform
+        run: |
+          pip install pre-commit==4.6.2 checkov==3.3.19
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin kubeconform
+      - run: pre-commit run --all-files --show-diff-on-failure
