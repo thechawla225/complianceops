@@ -1,0 +1,116 @@
+name: Service image (reusable)
+
+# Called by each service repo's CI after lint + tests pass on main:
+#   build -> Trivy scan -> push to ECR (tag = commit SHA) -> Cosign sign
+#   -> point gitops/<service>/values-dev.yaml in this repo at the new tag
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: "gateway | transaction | screening | notifier"
+        type: string
+        required: true
+    secrets:
+      HUB_DEPLOY_KEY:
+        description: "SSH deploy key with write access to this (complianceops) repo"
+        required: true
+
+permissions:
+  id-token: write   # AWS OIDC + Cosign keyless signing
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  ROLE_ARN: arn:aws:iam::697961193772:role/complianceops-service-image-ci
+  TRIVY_VERSION: "0.76.0"
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    # Two pushes to the same service run one after another, so the last
+    # commit's tag is the one that ends up in values-dev.yaml
+    concurrency:
+      group: service-image-${{ inputs.service }}
+      cancel-in-progress: false
+    env:
+      SERVICE: ${{ inputs.service }}
+    steps:
+      - name: validate service name
+        run: |
+          case "$SERVICE" in gateway|transaction|screening|notifier) ;; *) echo "::error::unknown service '$SERVICE'"; exit 1 ;; esac
+
+      - uses: actions/checkout@v7   # the calling service repo
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: image tag = short commit SHA
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          tag="${GITHUB_SHA::7}"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "IMAGE=$REGISTRY/complianceops-$SERVICE:$tag" >> "$GITHUB_ENV"
+          # Repos are IMMUTABLE: same SHA = same code, so an existing tag means skip the build
+          if aws ecr describe-images --repository-name "complianceops-$SERVICE" --image-ids imageTag="$tag" >/dev/null 2>&1; then
+            echo "EXISTS=true" >> "$GITHUB_ENV"
+            echo "complianceops-$SERVICE:$tag already in ECR - skipping build"
+          else
+            echo "EXISTS=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: docker build
+        if: env.EXISTS == 'false'
+        run: docker build -t "$IMAGE" .
+
+      - name: Trivy scan (fail on fixable CRITICAL)
+        if: env.EXISTS == 'false'
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            "aquasec/trivy:${TRIVY_VERSION}" image --no-progress \
+            --severity CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE"
+
+      - name: docker push
+        if: env.EXISTS == 'false'
+        run: docker push "$IMAGE"
+
+      - uses: sigstore/cosign-installer@v4
+        if: env.EXISTS == 'false'
+
+      - name: cosign sign (keyless, signed with this workflow's GitHub OIDC identity)
+        if: env.EXISTS == 'false'
+        run: |
+          digest_ref=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE")
+          cosign sign --yes "$digest_ref"
+
+      - uses: actions/checkout@v7   # the hub repo, to bump the deployed tag
+        with:
+          repository: thechawla225/complianceops
+          ref: main
+          ssh-key: ${{ secrets.HUB_DEPLOY_KEY }}
+          path: hub
+
+      - name: point gitops values-dev.yaml at the new image
+        working-directory: hub
+        run: |
+          file="gitops/$SERVICE/values-dev.yaml"
+          # replace only the quoted value of the first "  tag:" line (the image tag)
+          sed -i -E "0,/^  tag: \"[^\"]*\"/s//  tag: \"$TAG\"/" "$file"
+          if git diff --quiet; then echo "$file already at $TAG"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "deploy($SERVICE): dev -> $TAG"
+          # other services may have bumped their own file meanwhile; rebase and retry
+          for i in 1 2 3; do git pull --rebase -q && git push -q && exit 0; sleep 5; done
+          echo "::error::could not push tag bump to complianceops"; exit 1
+
+      - name: summary
+        run: |
+          echo "## complianceops-$SERVICE:$TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: \`$IMAGE\` (built: $([ "$EXISTS" = false ] && echo yes || echo 'no, already in ECR'))" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed tag in \`gitops/$SERVICE/values-dev.yaml\`: \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
