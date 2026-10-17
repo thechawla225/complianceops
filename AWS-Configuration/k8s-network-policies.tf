@@ -91,7 +91,7 @@ resource "kubernetes_network_policy" "transaction" {
     }
     #TODO
     # - egress to Postgres (in-cluster pod_selector, or an ipBlock/CIDR
-    # - egress to AWS SQS 
+    # - egress to AWS SQS
   }
 }
 
