@@ -49,6 +49,7 @@ repos:
       - id: terraform_tflint
         exclude: ^AWS-Configuration/k8s-network-policies\.tf$
       - id: terraform_checkov
+        args: [--args=--config-file __GIT_WORKING_DIR__/.checkov.yaml]
 
   - repo: local
     hooks:
