@@ -4,7 +4,7 @@ image:
   tag: "CHANGEME-git-sha"
 
 env:
-  TRANSACTION_SERVICE_URL: "http://transaction.sanctions-platform.svc.cluster.local:8001"
+  TRANSACTION_SERVICE_URL: "http://transaction.sanctions-platform.svc.cluster.local:8000"
   LOG_LEVEL: "warn"
 
 resources:
