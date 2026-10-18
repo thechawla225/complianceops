@@ -53,8 +53,7 @@ readinessProbe:
 
 
 env:
-  REDIS_HOST: ""
-  REDIS_PORT: "6379"
+  REDIS_ADDR: ""   # host:port, read by main.go
   LOG_LEVEL: "info"
 
 ingress:

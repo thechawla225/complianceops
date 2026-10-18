@@ -4,8 +4,7 @@ image:
   tag: "CHANGEME-git-sha"
 
 env:
-  REDIS_HOST: "redis.sanctions-platform.svc.cluster.local"
-  REDIS_PORT: "6379"
+  REDIS_ADDR: "redis.sanctions-platform.svc.cluster.local:6379"
   LOG_LEVEL: "warn"
 
 resources:
