@@ -4,7 +4,7 @@ image:
   tag: "d83df33"  # complianceops-gatewayservice commit
 
 env:
-  TRANSACTION_SERVICE_URL: "http://transaction.sanctions-platform.svc.cluster.local:8001"
+  TRANSACTION_SERVICE_URL: "http://transaction.sanctions-platform.svc.cluster.local:8000"
   LOG_LEVEL: "debug"
 
 resources:
