@@ -88,14 +88,19 @@ module "eks" {
     // before_compute = installed before the node group, so nodes join with networking ready.
     // coredns has no flag, so the module creates it after the node group (it needs nodes to run on).
     kube-proxy = { most_recent = true, before_compute = true }
-    vpc-cni    = { most_recent = true, before_compute = true }
+    // enableNetworkPolicy: without it the CNI accepts NetworkPolicies but never enforces them
+    vpc-cni = {
+      most_recent          = true
+      before_compute       = true
+      configuration_values = jsonencode({ enableNetworkPolicy = "true" })
+    }
   }
 
   // Added logic to prevent repeated uncommenting and commenting
   eks_managed_node_groups = var.create_node_group ? {
     default = {
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.small"]
+      instance_types = ["t3.medium"] # t3.small: ~11 pods and 2 GiB per node, too small for 6 workloads + system pods
       min_size       = 1
       max_size       = 2
       desired_size   = 2

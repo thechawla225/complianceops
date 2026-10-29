@@ -60,6 +60,7 @@ resource "kubernetes_network_policy" "gateway" {
           match_labels = { app = "transaction" }
         }
       }
+      ports { port = 8000 }
     }
   }
 }
@@ -81,6 +82,7 @@ resource "kubernetes_network_policy" "transaction" {
           match_labels = { app = "gateway" }
         }
       }
+      ports { port = 8000 }
     }
     egress {
       to {
@@ -88,10 +90,50 @@ resource "kubernetes_network_policy" "transaction" {
           match_labels = { app = "screening" }
         }
       }
+      ports { port = 8002 }
     }
-    #TODO
-    # - egress to Postgres (in-cluster pod_selector, or an ipBlock/CIDR
-    # - egress to AWS SQS
+    egress {
+      to {
+        pod_selector {
+          match_labels = { app = "postgres" }
+        }
+      }
+      ports { port = 5432 }
+    }
+    # SQS + STS (IRSA) are public AWS endpoints with changing IPs. Prod: VPC endpoints + VPC CIDR only.
+    egress {
+      to {
+        ip_block {
+          cidr = "0.0.0.0/0"
+        }
+      }
+      ports {
+        port     = 443
+        protocol = "TCP"
+      }
+    }
+  }
+}
+
+
+resource "kubernetes_network_policy" "postgres" {
+  metadata {
+    name      = "postgres-policy"
+    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
+  }
+  spec {
+    pod_selector {
+      match_labels = { app = "postgres" }
+    }
+    policy_types = ["Ingress"]
+    ingress {
+      from {
+        pod_selector {
+          match_labels = { app = "transaction" }
+        }
+      }
+      ports { port = 5432 }
+    }
   }
 }
 
@@ -112,6 +154,7 @@ resource "kubernetes_network_policy" "screening" {
           match_labels = { app = "transaction" }
         }
       }
+      ports { port = 8002 }
     }
     egress {
       to {
@@ -119,6 +162,7 @@ resource "kubernetes_network_policy" "screening" {
           match_labels = { app = "redis" }
         }
       }
+      ports { port = 6379 }
     }
   }
 }
@@ -140,6 +184,7 @@ resource "kubernetes_network_policy" "redis" {
           match_labels = { app = "screening" }
         }
       }
+      ports { port = 6379 }
     }
   }
 }
