@@ -1,0 +1,2 @@
+# Dev uses the defaults in values.yaml. Redis is only a cache here: Screening reloads the
+# watchlist from watchlist.json on every start, so nothing is persisted.
