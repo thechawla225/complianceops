@@ -5,7 +5,6 @@ image:
 
 env:
   SCREENING_SERVICE_URL: "http://screening.sanctions-platform.svc.cluster.local:8002"
-  DATABASE_URL: ""
   SQS_QUEUE_URL: "https://sqs.us-west-2.amazonaws.com/697961193772/complianceops-flagged-transactions"
   LOG_LEVEL: "debug"
 

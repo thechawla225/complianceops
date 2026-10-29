@@ -1,0 +1,21 @@
+namespace: sanctions-platform
+
+image:
+  repository: postgres
+  tag: "16.15-trixie"   # Debian 13 base, same as the other images
+  pullPolicy: IfNotPresent
+
+database: complianceops
+user: complianceops
+# Created by Terraform (non-persistent/main.tf: kubernetes_secret.postgres_credentials)
+existingSecretName: postgres-credentials
+
+port: 5432
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

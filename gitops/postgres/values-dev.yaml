@@ -1,0 +1,2 @@
+# Dev uses the defaults in values.yaml. Data lives in an emptyDir: it's lost when the pod is
+# rescheduled, which is fine for a dev cluster that is destroyed after every session.

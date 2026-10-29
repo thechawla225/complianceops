@@ -1,0 +1,11 @@
+apiVersion: v2
+name: postgres
+description: ComplianceOps dev Postgres for the Transaction Service (not for prod; prod uses RDS)
+type: application
+version: 0.1.0
+appVersion: "16.15"
+keywords:
+  - complianceops
+  - postgres
+maintainers:
+  - name: Ankit

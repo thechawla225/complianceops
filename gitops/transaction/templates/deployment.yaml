@@ -5,6 +5,9 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "transaction.labels" . | nindent 4 }}
+  annotations:
+    # Scoped to this Deployment. TODO(Phase 07): Vault + External Secrets mount it as a file instead.
+    checkov.io/skip1: CKV_K8S_35=DATABASE_URL is an env var from the Terraform-managed postgres-credentials Secret until Phase 07
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -37,6 +40,13 @@ spec:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
+            {{- end }}
+            {{- with .Values.databaseUrlFrom }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: DATABASE_URL
             {{- end }}
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}

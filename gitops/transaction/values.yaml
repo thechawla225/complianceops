@@ -8,6 +8,8 @@ image:
 
 namespace: sanctions-platform
 serviceAccountName: transaction-sa
+# DATABASE_URL comes from this Secret (created by Terraform in non-persistent/main.tf)
+databaseUrlFrom: postgres-credentials
 # IRSA still works: the EKS webhook mounts its own aws-iam-token volume (CKV_K8S_38)
 automountServiceAccountToken: false
 
@@ -53,7 +55,6 @@ readinessProbe:
 
 env:
   SCREENING_SERVICE_URL: ""
-  DATABASE_URL: ""
   SQS_QUEUE_URL: ""
   LOG_LEVEL: "info"
 
