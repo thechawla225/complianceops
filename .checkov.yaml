@@ -9,8 +9,8 @@ skip-check:
   # The tag is blank in values.yaml on purpose: each environment sets it (values-dev.yaml, bumped by CI).
   # Checkov renders charts with values.yaml only, so it always sees the blank default.
   - CKV_K8S_14   # Image Tag should be fixed - not latest or blank
-  # NetworkPolicies are managed in Terraform (k8s-network-policies.tf, moving into non-persistent in
-  # Phase B), not in the charts, so Checkov's chart scan can't see them.
+  # NetworkPolicies are managed in Terraform (non-persistent/k8s-network-policies.tf), not in the
+  # charts, so Checkov's chart scan can't see them.
   - CKV2_K8S_6   # Pods should have an associated NetworkPolicy
   # The workflow_dispatch inputs are deliberate safety controls (apply checkbox, typed "destroy"
   # confirmation), passed via env: to prevent injection. They don't feed a build.
