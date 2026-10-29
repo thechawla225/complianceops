@@ -1,0 +1,16 @@
+namespace: sanctions-platform
+
+image:
+  repository: redis
+  tag: "8.10.3-trixie"   # Debian 13 base, same as the other images
+  pullPolicy: IfNotPresent
+
+port: 6379
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

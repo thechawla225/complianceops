@@ -14,7 +14,7 @@ serviceAccountName: notifier-sa
 automountServiceAccountToken: false
 
 
-healthPort: 8000
+healthPort: 8003   # the notifier listens on 8003 (src/config.js); used only by the probes
 
 resources:
   requests:
