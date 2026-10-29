@@ -1,0 +1,47 @@
+name: Chart smoke test
+
+# Installs the dev datastore charts on a throwaway kind cluster to prove they start with our
+# hardening (UID 10001, read-only root filesystem, dropped capabilities). Runs in CI because
+# Docker isn't available locally. App charts aren't included: their images are in private ECR.
+on:
+  pull_request:
+    paths:
+      - "gitops/postgres/**"
+      - "gitops/redis/**"
+      - ".github/workflows/chart-smoke.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: helm/kind-action@v1.15.1
+        with:
+          version: v0.33.0
+      - name: Namespace and the Secret Terraform creates on EKS
+        run: |
+          kubectl create namespace sanctions-platform
+          kubectl -n sanctions-platform create secret generic postgres-credentials \
+            --from-literal=POSTGRES_PASSWORD=smoke-test --from-literal=DATABASE_URL=unused
+      - name: Install postgres and redis (fails if pods don't become Ready)
+        run: |
+          for c in postgres redis; do
+            helm install "$c" "gitops/$c" -f "gitops/$c/values-dev.yaml" \
+              -n sanctions-platform --wait --timeout 3m
+          done
+      - name: Prove they work, not just that probes pass
+        run: |
+          kubectl -n sanctions-platform exec deploy/postgres -- \
+            psql -U complianceops -d complianceops -c 'select current_user, version();'
+          kubectl -n sanctions-platform exec deploy/redis -- redis-cli ping
+          kubectl -n sanctions-platform exec deploy/redis -- id
+      - name: Debug output on failure
+        if: failure()
+        run: |
+          kubectl -n sanctions-platform get pods -o wide
+          kubectl -n sanctions-platform describe pods
+          kubectl -n sanctions-platform logs deploy/postgres --tail=50 || true
+          kubectl -n sanctions-platform logs deploy/redis --tail=50 || true
