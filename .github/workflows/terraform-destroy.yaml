@@ -62,6 +62,25 @@ jobs:
           echo "::warning::First destroy attempt failed — retrying with a fresh EKS token"
           terraform destroy -auto-approve -var="create_node_group=true"
 
+      # A green destroy only means Terraform finished. On 17 Oct it "succeeded" in 33s while a
+      # cluster it had lost track of kept running for 13 days. Ask AWS directly instead.
+      - name: verify nothing billable is left
+        if: always()
+        shell: bash
+        run: |
+          fail=0
+          check() {
+            if [ "$2" != "0" ]; then echo "::error::$1 still exists ($2)"; fail=1; else echo "OK: no $1"; fi
+          }
+          check "Terraform-managed resources" "$(terraform state list | wc -l)"
+          check "EKS cluster complianceops-eks" "$(aws eks list-clusters --query "length(clusters[?@=='complianceops-eks'])")"
+          check "NAT gateways" "$(aws ec2 describe-nat-gateways --filter Name=state,Values=pending,available --query 'length(NatGateways)')"
+          check "complianceops VPC" "$(aws ec2 describe-vpcs --filters Name=tag:Name,Values=complianceops-vpc --query 'length(Vpcs)')"
+          check "Elastic IPs" "$(aws ec2 describe-addresses --query 'length(Addresses)')"
+          check "load balancers" "$(aws elbv2 describe-load-balancers --query 'length(LoadBalancers)')"
+          check "unattached EBS volumes" "$(aws ec2 describe-volumes --filters Name=status,Values=available --query 'length(Volumes)')"
+          exit "$fail"
+
   rejected:
     name: confirmation missing
     if: inputs.confirm != 'destroy'
