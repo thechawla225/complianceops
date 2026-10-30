@@ -100,7 +100,7 @@ module "eks" {
   eks_managed_node_groups = var.create_node_group ? {
     default = {
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.medium"] # t3.small: ~11 pods and 2 GiB per node, too small for 6 workloads + system pods
+      instance_types = ["c7i-flex.large"] # Free-plan eligible; 4 GiB, 29 pods/node (t3.small: 2 GiB, 11 pods; t3.medium not allowed)
       min_size       = 1
       max_size       = 2
       desired_size   = 2
