@@ -122,6 +122,15 @@ provider "kubernetes" {
   token                  = data.aws_eks_cluster_auth.this.token
 }
 
+// Same connection as the kubernetes provider. In helm provider v3 `kubernetes` is an attribute, not a block.
+provider "helm" {
+  kubernetes = {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    token                  = data.aws_eks_cluster_auth.this.token
+  }
+}
+
 // -----------------------------------------------------EBS CSI (IRSA, tied to this cluster's OIDC provider)-----------------------------------------------------
 
 data "aws_iam_policy_document" "ebs_csi_assume_role" {
