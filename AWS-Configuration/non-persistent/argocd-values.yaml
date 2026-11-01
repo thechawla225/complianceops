@@ -1,0 +1,31 @@
+# Values for the argo-cd chart (argocd.tf). Everything not set here uses the chart defaults.
+# The UI is reached with `kubectl -n argocd port-forward svc/argocd-server 8080:443`:
+# the server Service stays ClusterIP, so no load balancer is created.
+
+# SSO and event notifications aren't needed for a single-user dev cluster
+dex:
+  enabled: false
+notifications:
+  enabled: false
+
+# The chart leaves resources empty (unbounded); keep the footprint small on 2 nodes
+controller:
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+repoServer:
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+server:
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+applicationSet:
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+redis:
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
