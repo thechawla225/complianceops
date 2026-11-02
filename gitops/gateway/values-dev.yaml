@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  tag: "d83df33"  # complianceops-gatewayservice commit
+  tag: "a7dc2ab"  # complianceops-gatewayservice commit
 
 env:
   TRANSACTION_SERVICE_URL: "http://transaction.sanctions-platform.svc.cluster.local:8000"
