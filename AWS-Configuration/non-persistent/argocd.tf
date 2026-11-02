@@ -15,3 +15,17 @@ resource "helm_release" "argocd" {
   // Needs the cluster and nodes; on destroy it's removed before them
   depends_on = [module.eks]
 }
+
+// One ApplicationSet: an Application per gitops/<chart> folder (see argocd-apps-values.yaml).
+// A Helm release, not kubernetes_manifest, because the ApplicationSet CRD doesn't exist at plan time.
+resource "helm_release" "argocd_apps" {
+  name       = "argocd-apps"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argocd-apps"
+  version    = "2.0.7"
+  namespace  = "argocd"
+  values     = [file("${path.module}/argocd-apps-values.yaml")]
+
+  // CRDs and the ApplicationSet controller come from the argocd release; destroy removes this first
+  depends_on = [helm_release.argocd]
+}
