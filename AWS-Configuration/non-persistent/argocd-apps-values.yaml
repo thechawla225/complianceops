@@ -1,0 +1,42 @@
+applicationsets:
+  services:
+    namespace: argocd
+    goTemplate: true
+    goTemplateOptions: ["missingkey=error"]
+    generators:
+      - git:
+          repoURL: https://github.com/thechawla225/complianceops.git
+          revision: main
+          directories:
+            - path: gitops/*
+    # Deleting the ApplicationSet (on destroy) removes Applications without cascading, so nothing can hang
+    syncPolicy:
+      preserveResourcesOnDeletion: true
+    template:
+      metadata:
+        # Also the Helm release name, so Service names stay transaction, screening, ...
+        name: "{{.path.basename}}"
+      spec:
+        project: default
+        source:
+          repoURL: https://github.com/thechawla225/complianceops.git
+          targetRevision: main
+          path: "{{.path.path}}"
+          helm:
+            valueFiles:
+              - values-dev.yaml
+        # Namespace, SAs, Secret and NetworkPolicies are Terraform's; Argo CD only deploys the charts
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: sanctions-platform
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+          # First boot: screening/transaction can start before redis/postgres; retry instead of ordering
+          retry:
+            limit: 5
+            backoff:
+              duration: 10s
+              factor: 2
+              maxDuration: 3m
