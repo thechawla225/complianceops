@@ -20,3 +20,11 @@ docs live here; application code lives in the four complianceops-service repos.
 
 
 verify-round-trip.ps1 -> this script validates the connection between gateway and the transaction service
+
+## Deployment
+
+Argo CD deploys every chart in `gitops/` from `main`; there is no manual deploy step. A merged service PR
+reaches the cluster in about 7 minutes. See the [runbook](docs/runbook.md) for bring-up, teardown, rollback and
+troubleshooting, and [ADR 0008](docs/adr/0008-argocd-installed-by-terraform.md) for the design and results.
+
+![Argo CD: all applications Synced and Healthy](docs/images/argocd-applications-overview.png)

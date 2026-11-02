@@ -112,6 +112,13 @@ module "eks" {
   } : null
 }
 
+// Access entries take a few seconds to propagate after creation; without this pause the first
+// Kubernetes call on a fresh cluster fails with "namespaces is forbidden" and apply must be re-run.
+resource "time_sleep" "eks_access_propagation" {
+  create_duration = "30s"
+  depends_on      = [module.eks]
+}
+
 data "aws_eks_cluster_auth" "this" {
   name = module.eks.cluster_name
 }
@@ -176,6 +183,9 @@ resource "kubernetes_namespace" "sanctions_platform" {
   metadata {
     name = "sanctions-platform"
   }
+
+  // First Kubernetes resource Terraform creates; everything in the namespace follows it
+  depends_on = [time_sleep.eks_access_propagation]
 }
 
 // Dev Postgres credentials (gitops/postgres + transaction). Generated here so no password is in Git;
