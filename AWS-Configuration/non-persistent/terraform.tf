@@ -16,6 +16,10 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 3.3"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.14"
+    }
   }
 
   required_version = ">= 1.11.0"

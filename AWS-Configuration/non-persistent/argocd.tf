@@ -12,8 +12,8 @@ resource "helm_release" "argocd" {
   timeout          = 600
   values           = [file("${path.module}/argocd-values.yaml")]
 
-  // Needs the cluster and nodes; on destroy it's removed before them
-  depends_on = [module.eks]
+  // Needs the cluster, nodes and propagated access entries; on destroy it's removed before them
+  depends_on = [time_sleep.eks_access_propagation]
 }
 
 // One ApplicationSet: an Application per gitops/<chart> folder (see argocd-apps-values.yaml).
