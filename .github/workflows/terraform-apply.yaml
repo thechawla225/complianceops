@@ -163,3 +163,51 @@ jobs:
             echo '```'
             echo "Connect locally: \`aws eks update-kubeconfig --name $CLUSTER --region $AWS_REGION\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Terraform only proves Argo CD itself is running; it deploys the apps asynchronously afterwards.
+      # Green here means every gitops/ chart is Synced (matches Git) and Healthy (actually working).
+      - name: verify apps (Argo CD)
+        if: github.event_name == 'workflow_dispatch' && inputs.apply_non_persistent
+        shell: bash
+        run: |
+          # One Application per chart folder; counted, not hardcoded, so a new service is covered too
+          expected=$(find "$GITHUB_WORKSPACE/gitops" -mindepth 2 -maxdepth 2 -name Chart.yaml | wc -l)
+          status() {
+            kubectl -n argocd get applications -o custom-columns='NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status'
+          }
+
+          echo "::group::ApplicationSet generated $expected Applications"
+          for _ in $(seq 36); do
+            count=$( (kubectl -n argocd get applications --no-headers 2>/dev/null || true) | wc -l)
+            [ "$count" -ge "$expected" ] && break
+            sleep 5
+          done
+          if [ "$count" -lt "$expected" ]; then
+            echo "::error::expected $expected Applications (one per gitops/ chart), found $count"
+            kubectl -n argocd get applicationset services -o jsonpath='{.status.conditions}'; echo
+            exit 1
+          fi
+          status
+          echo "::endgroup::"
+
+          # First boot: screening/transaction may restart until redis/postgres are up, hence 10m
+          echo "::group::All Applications Synced and Healthy"
+          if ! kubectl -n argocd wait applications --all --for=jsonpath='{.status.sync.status}'=Synced --timeout=10m \
+            || ! kubectl -n argocd wait applications --all --for=jsonpath='{.status.health.status}'=Healthy --timeout=10m; then
+            echo "::error::not every Application became Synced and Healthy"
+            kubectl -n argocd get applications -o custom-columns='NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,MESSAGE:.status.health.message,OPERATION:.status.operationState.message,CONDITIONS:.status.conditions[*].message'
+            kubectl -n sanctions-platform get pods
+            exit 1
+          fi
+          status
+          echo "::endgroup::"
+
+          {
+            echo "## Apps deployed by Argo CD ✅"
+            echo '```'
+            status
+            echo
+            kubectl -n sanctions-platform get pods
+            echo '```'
+            echo "Argo CD UI: \`kubectl -n argocd port-forward svc/argocd-server 8080:443\`, user \`admin\`, initial password in the \`argocd-initial-admin-secret\` Secret"
+          } >> "$GITHUB_STEP_SUMMARY"
