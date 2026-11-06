@@ -1,7 +1,8 @@
 # Containers must run as non-root, can't gain privileges and can't be privileged.
 # runAsNonRoot may be set on the container or inherited from the pod securityContext (postgres and redis set it on the
 # pod, the app charts on the container); a container-level false overrides the pod.
-# Audit first (Phase 07): switch to Deny once tests and reports are clean.
+# Deny (Phase 07.6): proven by kyverno test + every chart in CI. Fails closed: if Kyverno is down, new pods in
+# sanctions-platform are blocked; argocd, kube-system and kyverno are excluded so recovery is always possible.
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
@@ -13,7 +14,8 @@ metadata:
       runAsNonRoot must be true (container or pod level), allowPrivilegeEscalation must be false,
       and privileged must not be true.
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
+  failurePolicy: Fail
   matchConstraints:
     namespaceSelector:
       matchLabels:

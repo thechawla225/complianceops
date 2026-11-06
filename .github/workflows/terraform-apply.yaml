@@ -211,3 +211,65 @@ jobs:
             echo '```'
             echo "Argo CD UI: \`kubectl -n argocd port-forward svc/argocd-server 8080:443\`, user \`admin\`, initial password in the \`argocd-initial-admin-secret\` Secret"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Phase 07 guardrails, proven on every rebuild (ADR 0013-0015): policies Ready, the Postgres secret synced from
+      # Secrets Manager, no policy violations by the running apps, and every bad test manifest rejected at admission.
+      # Server-side dry-run goes through the admission webhooks but creates nothing.
+      - name: verify guardrails (Kyverno, External Secrets)
+        if: github.event_name == 'workflow_dispatch' && inputs.apply_non_persistent
+        shell: bash
+        run: |
+          echo "::group::Kyverno policies Ready"
+          kubectl wait validatingpolicies.policies.kyverno.io --all \
+            --for=jsonpath='{.status.conditionStatus.ready}'=true --timeout=3m
+          kubectl wait imagevalidatingpolicies.policies.kyverno.io --all \
+            --for=jsonpath='{.status.conditionStatus.ready}'=true --timeout=3m
+          kubectl get validatingpolicies.policies.kyverno.io,imagevalidatingpolicies.policies.kyverno.io
+          echo "::endgroup::"
+
+          echo "::group::Postgres secret synced from Secrets Manager"
+          kubectl -n sanctions-platform wait --for=condition=Ready \
+            secretstore/aws-secrets-manager externalsecret/postgres-credentials --timeout=3m
+          kubectl -n sanctions-platform get secret postgres-credentials -o jsonpath='{.data}' \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin); assert {"POSTGRES_PASSWORD","DATABASE_URL"} <= d.keys(), d.keys(); print("keys:", sorted(d))'
+          echo "::endgroup::"
+
+          echo "::group::No policy violations by the running apps (PolicyReports)"
+          for _ in $(seq 24); do
+            n=$( (kubectl -n sanctions-platform get policyreports --no-headers 2>/dev/null || true) | wc -l)
+            [ "$n" -gt 0 ] && break
+            sleep 5
+          done
+          [ "$n" -gt 0 ] || { echo "::error::no PolicyReports after 2 min: is the Kyverno reports controller running?"; exit 1; }
+          kubectl -n sanctions-platform get policyreports
+          bad=$(kubectl -n sanctions-platform get policyreports -o json \
+            | python3 -c 'import json,sys; print(sum(r.get("summary",{}).get("fail",0)+r.get("summary",{}).get("error",0) for r in json.load(sys.stdin)["items"]))')
+          [ "$bad" -eq 0 ] || { echo "::error::$bad policy fail/error results in sanctions-platform"; exit 1; }
+          echo "::endgroup::"
+
+          echo "::group::Admission: bad manifests rejected, good ones accepted (tests/policies, same cases as CI)"
+          dir="$RUNNER_TEMP/admission"; mkdir -p "$dir"
+          # One file per test resource, named after it (yq is preinstalled on GitHub's Ubuntu runners)
+          (cd "$dir" && yq -s '.metadata.name' "$GITHUB_WORKSPACE/tests/policies/resources.yaml")
+          failed=0
+          for f in "$dir"/*.yml; do
+            name=$(basename "$f" .yml)
+            if out=$(kubectl apply --dry-run=server -f "$f" 2>&1); then
+              if [[ "$name" == bad-* ]]; then echo "::error::$name was ACCEPTED"; failed=1; else echo "accepted (expected): $name"; fi
+            else
+              if [[ "$name" == good-* ]]; then echo "::error::$name was REJECTED: $out"; failed=1
+              elif ! grep -qi kyverno <<<"$out"; then echo "::error::$name rejected, but not by Kyverno: $out"; failed=1
+              else echo "rejected (expected): $name -> $(grep -o 'denied the request.*' <<<"$out" | head -c 200)"; fi
+            fi
+          done
+          [ "$failed" -eq 0 ] || exit 1
+          echo "::endgroup::"
+
+          {
+            echo "## Guardrails ✅"
+            echo '```'
+            kubectl get validatingpolicies.policies.kyverno.io,imagevalidatingpolicies.policies.kyverno.io
+            echo
+            kubectl -n sanctions-platform get secretstore,externalsecret
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

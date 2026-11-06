@@ -1,7 +1,8 @@
 # Every container must declare CPU and memory requests and limits.
 # The namespace LimitRange injects defaults into pods, so the pod check alone could pass a chart that forgot them;
 # the Deployment check (autogen) sees the manifest as written and reports it.
-# Audit first (Phase 07): switch to Deny once tests and reports are clean.
+# Deny (Phase 07.6): proven by kyverno test + every chart in CI. Fails closed: if Kyverno is down, new pods in
+# sanctions-platform are blocked; argocd, kube-system and kyverno are excluded so recovery is always possible.
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
@@ -12,7 +13,8 @@ metadata:
     policies.kyverno.io/description: >-
       Every container must set cpu and memory requests and limits, so one pod can't starve a node.
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
+  failurePolicy: Fail
   matchConstraints:
     namespaceSelector:
       matchLabels:

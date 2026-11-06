@@ -1,7 +1,8 @@
 # Images must be our own, from our ECR, or one of two official datastore images allow-listed by exact digest.
 # Docker Hub tags are mutable, so the allow-list pins digests; gitops/postgres and gitops/redis values.yaml pin the same
 # ones. Change both together. In production these would be mirrored (ECR pull-through cache) instead (ADR 0013).
-# Audit first (Phase 07): switch to Deny once tests and reports are clean.
+# Deny (Phase 07.6): proven by kyverno test + every chart in CI. Fails closed: if Kyverno is down, new pods in
+# sanctions-platform are blocked; argocd, kube-system and kyverno are excluded so recovery is always possible.
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
@@ -13,7 +14,8 @@ metadata:
       Images must come from this account's complianceops ECR repositories, except the allow-listed,
       digest-pinned postgres and redis images.
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
+  failurePolicy: Fail
   matchConstraints:
     namespaceSelector:
       matchLabels:
