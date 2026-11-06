@@ -2,7 +2,9 @@ namespace: sanctions-platform
 
 image:
   repository: redis
-  tag: "8.10.3-trixie"   # Debian 13 base, same as the other images
+  # Debian 13 base, same as the other images. Pinned by digest: Docker Hub tags are mutable, and Kyverno
+  # allow-lists this exact image (policies/restrict-image-registries.yaml). Change both together.
+  tag: "8.10.3-trixie@sha256:f245f4c83b84a9e9a0588da1c9456e579455310f0945d5db52cd2ba27f2000cc"
   pullPolicy: IfNotPresent
 
 port: 6379

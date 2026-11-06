@@ -1,0 +1,10 @@
+# Offline there's no cluster to read namespace labels from; the policies match sanctions-platform by label, so supply it.
+# Without this every result would be "skip". Used by kyverno test and by kyverno apply on the rendered charts.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Value
+metadata:
+  name: values
+namespaceSelector:
+  - name: sanctions-platform
+    labels:
+      kubernetes.io/metadata.name: sanctions-platform
