@@ -1,0 +1,46 @@
+# Containers must run as non-root, can't gain privileges and can't be privileged.
+# runAsNonRoot may be set on the container or inherited from the pod securityContext (postgres and redis set it on the
+# pod, the app charts on the container); a container-level false overrides the pod.
+# Audit first (Phase 07): switch to Deny once tests and reports are clean.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-non-root
+  annotations:
+    policies.kyverno.io/title: Require non-root, unprivileged containers
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      runAsNonRoot must be true (container or pod level), allowPrivilegeEscalation must be false,
+      and privileged must not be true.
+spec:
+  validationActions: [Audit]
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: sanctions-platform
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  autogen:
+    podControllers:
+      controllers: [deployments]
+  variables:
+    - name: containers
+      expression: object.spec.containers + object.spec.?initContainers.orValue([])
+    - name: podNonRoot
+      expression: object.spec.?securityContext.?runAsNonRoot.orValue(false)
+  validations:
+    - expression: >-
+        variables.containers.all(c,
+          c.?securityContext.?runAsNonRoot.orValue(variables.podNonRoot) == true)
+      message: "runAsNonRoot must be true, on the container or the pod securityContext."
+    - expression: >-
+        variables.containers.all(c,
+          c.?securityContext.?allowPrivilegeEscalation.orValue(true) == false)
+      message: "Every container must set securityContext.allowPrivilegeEscalation: false."
+    - expression: >-
+        variables.containers.all(c,
+          c.?securityContext.?privileged.orValue(false) == false)
+      message: "Privileged containers are not allowed."

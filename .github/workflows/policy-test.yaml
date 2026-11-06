@@ -1,0 +1,65 @@
+name: Policy test
+
+# Tests the Kyverno policies offline (no cluster, no AWS), in two ways:
+#  1. kyverno test: every policy against good and bad resources with declared expected results (tests/policies/).
+#  2. kyverno apply: every real chart, rendered with values-dev.yaml, must pass every policy. This is what makes
+#     switching a policy from Audit to Deny safe.
+# Meant to be a required status check ("policy-test"), so it runs on every PR: no path filters.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  KYVERNO_VERSION: v1.19.2   # same as the in-cluster Kyverno (non-persistent/kyverno.tf)
+  # From the release's checksums.txt. Pinned here, not downloaded with the binary, so a tampered release fails.
+  KYVERNO_CLI_SHA256: 357eaf1df8bc24ddd5a73979fadeaae6a032e8710f11af264229756e4956bf4a
+
+jobs:
+  policy-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.0
+      - name: install Kyverno CLI (checksum verified)
+        run: |
+          file="kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz"
+          curl -sSLf -o "$RUNNER_TEMP/$file" \
+            "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/$file"
+          echo "${KYVERNO_CLI_SHA256}  $RUNNER_TEMP/$file" | sha256sum -c -
+          sudo tar -xzf "$RUNNER_TEMP/$file" -C /usr/local/bin kyverno
+          kyverno version
+
+      - name: kyverno test (good and bad resources)
+        run: kyverno test tests/policies/ --detailed-results
+
+      - name: kyverno apply (every chart, rendered with values-dev.yaml)
+        run: |
+          rendered="$RUNNER_TEMP/charts.yaml"
+          : > "$rendered"
+          for d in gitops/*/; do
+            [ -f "$d/Chart.yaml" ] || continue
+            name=$(basename "$d")
+            # Release name = folder name, as the ApplicationSet does
+            helm template "$name" "$d" -f "$d/values-dev.yaml" >> "$rendered"
+          done
+          out=$(kyverno apply policies/ --resource "$rendered" --values-file tests/policies/values.yaml 2>&1) || true
+          echo "$out"
+          # Fail on any fail/error, and on zero passes (a selector mismatch would skip everything and look green)
+          summary=$(echo "$out" | grep -E 'pass: [0-9]+, fail: [0-9]+' | tail -1)
+          [ -n "$summary" ] || { echo "::error::no summary line in kyverno apply output"; exit 1; }
+          pass=$(echo "$summary" | sed -E 's/.*pass: ([0-9]+).*/\1/')
+          fail=$(echo "$summary" | sed -E 's/.*fail: ([0-9]+).*/\1/')
+          error=$(echo "$summary" | sed -E 's/.*error: ([0-9]+).*/\1/')
+          echo "pass=$pass fail=$fail error=$error"
+          if [ "$fail" -ne 0 ] || [ "$error" -ne 0 ]; then
+            echo "::error::a chart in gitops/ violates a policy"; exit 1
+          fi
+          if [ "$pass" -eq 0 ]; then
+            echo "::error::no policy passed on any chart: check the namespace selector values"; exit 1
+          fi

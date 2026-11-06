@@ -1,0 +1,37 @@
+# Every container must declare CPU and memory requests and limits.
+# The namespace LimitRange injects defaults into pods, so the pod check alone could pass a chart that forgot them;
+# the Deployment check (autogen) sees the manifest as written and reports it.
+# Audit first (Phase 07): switch to Deny once tests and reports are clean.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require resource requests and limits
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Every container must set cpu and memory requests and limits, so one pod can't starve a node.
+spec:
+  validationActions: [Audit]
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: sanctions-platform
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  autogen:
+    podControllers:
+      controllers: [deployments]
+  variables:
+    - name: containers
+      expression: object.spec.containers + object.spec.?initContainers.orValue([])
+  validations:
+    - expression: >-
+        variables.containers.all(c,
+          ['cpu', 'memory'].all(r,
+            r in c.?resources.?requests.orValue({}) &&
+            r in c.?resources.?limits.orValue({})))
+      message: "Every container must set cpu and memory in both resources.requests and resources.limits."

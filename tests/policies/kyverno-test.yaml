@@ -1,0 +1,144 @@
+# kyverno test tests/policies/ : every policy against good and bad resources (CI: .github/workflows/policy-test.yaml).
+# Results are declared for every resource and policy, so a silent "skip" fails the test instead of passing.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: complianceops-policies
+policies:
+- ../../policies/disallow-latest-tag.yaml
+- ../../policies/require-resource-limits.yaml
+- ../../policies/require-non-root.yaml
+- ../../policies/restrict-image-registries.yaml
+resources:
+- resources.yaml
+variables: values.yaml
+results:
+- policy: disallow-latest-tag
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - good-app
+  - good-pod-level-nonroot
+  - bad-no-limits
+  - bad-no-memory-request
+  - bad-root
+  - bad-container-overrides-pod
+  - bad-privilege-escalation
+  - bad-privileged
+  - bad-docker-hub
+  - bad-postgres-not-pinned
+  - bad-init-container
+  result: pass
+- policy: disallow-latest-tag
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - bad-latest
+  - bad-no-tag
+  - bad-registry-port-no-tag
+  result: fail
+- policy: require-resource-limits
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - good-app
+  - good-pod-level-nonroot
+  - bad-latest
+  - bad-no-tag
+  - bad-registry-port-no-tag
+  - bad-root
+  - bad-container-overrides-pod
+  - bad-privilege-escalation
+  - bad-privileged
+  - bad-docker-hub
+  - bad-postgres-not-pinned
+  - bad-init-container
+  result: pass
+- policy: require-resource-limits
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - bad-no-limits
+  - bad-no-memory-request
+  result: fail
+- policy: require-non-root
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - good-app
+  - good-pod-level-nonroot
+  - bad-latest
+  - bad-no-tag
+  - bad-registry-port-no-tag
+  - bad-no-limits
+  - bad-no-memory-request
+  - bad-docker-hub
+  - bad-postgres-not-pinned
+  - bad-init-container
+  result: pass
+- policy: require-non-root
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - bad-root
+  - bad-container-overrides-pod
+  - bad-privilege-escalation
+  - bad-privileged
+  result: fail
+- policy: restrict-image-registries
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - good-app
+  - good-pod-level-nonroot
+  - bad-latest
+  - bad-no-tag
+  - bad-no-limits
+  - bad-no-memory-request
+  - bad-root
+  - bad-container-overrides-pod
+  - bad-privilege-escalation
+  - bad-privileged
+  result: pass
+- policy: restrict-image-registries
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - bad-registry-port-no-tag
+  - bad-docker-hub
+  - bad-postgres-not-pinned
+  - bad-init-container
+  result: fail
+- policy: disallow-latest-tag
+  isValidatingPolicy: true
+  kind: Deployment
+  resources:
+  - good-deployment
+  - bad-deployment-no-limits
+  result: pass
+- policy: require-resource-limits
+  isValidatingPolicy: true
+  kind: Deployment
+  resources:
+  - good-deployment
+  result: pass
+- policy: require-resource-limits
+  isValidatingPolicy: true
+  kind: Deployment
+  resources:
+  - bad-deployment-no-limits
+  result: fail
+- policy: require-non-root
+  isValidatingPolicy: true
+  kind: Deployment
+  resources:
+  - good-deployment
+  - bad-deployment-no-limits
+  result: pass
+- policy: restrict-image-registries
+  isValidatingPolicy: true
+  kind: Deployment
+  resources:
+  - good-deployment
+  - bad-deployment-no-limits
+  result: pass
