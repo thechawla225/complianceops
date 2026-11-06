@@ -1,5 +1,9 @@
 # Checkov config, used by the terraform_checkov pre-commit hook (locally and in CI).
 # Every skip here is an accepted decision with its reason. Real findings get fixed, not listed.
+skip-path:
+  # Deliberately non-compliant test fixtures for the Kyverno policies (Phase 07.3); never deployed.
+  # The real charts in gitops/ are still scanned in full.
+  - tests/policies
 skip-check:
   # Images are pinned by immutable commit-SHA tags in IMMUTABLE ECR repos, and signed by digest
   # (ADR 0006, 0012). Kyverno will verify the signature at admission (Phase 07).
