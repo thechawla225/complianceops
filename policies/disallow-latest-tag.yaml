@@ -1,0 +1,40 @@
+# Images must carry an explicit tag (or digest), never :latest or no tag (which means :latest).
+# A floating tag can change under a running Deployment and breaks rollback-by-revert (ADR 0006).
+# Audit first (Phase 07.1): violations land in PolicyReports; switch to Deny once reports are clean.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow latest tag
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Every container image must have an explicit tag other than latest, or a digest.
+spec:
+  validationActions: [Audit]
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: sanctions-platform
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  # Also check Deployments, so a bad manifest is reported before its ReplicaSet tries to create pods
+  autogen:
+    podControllers:
+      controllers: [deployments]
+  variables:
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, c.image) +
+        object.spec.?initContainers.orValue([]).map(c, c.image)
+  validations:
+    # The part after the last "/" must contain ":" (tag) or "@" (digest), so "host:5000/app" counts as untagged.
+    # CEL matches() is an unanchored RE2 search.
+    - expression: >-
+        variables.images.all(img,
+          img.matches('[:@][^/]*$') &&
+          !img.matches(':latest(@|$)'))
+      message: "Images must use an explicit tag other than latest, or a digest."

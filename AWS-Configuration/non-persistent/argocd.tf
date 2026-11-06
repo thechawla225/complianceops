@@ -26,6 +26,7 @@ resource "helm_release" "argocd_apps" {
   namespace  = "argocd"
   values     = [file("${path.module}/argocd-apps-values.yaml")]
 
-  // CRDs and the ApplicationSet controller come from the argocd release; destroy removes this first
-  depends_on = [helm_release.argocd]
+  // CRDs and the ApplicationSet controller come from the argocd release; destroy removes this first.
+  // Kyverno too: its webhook must be up before Argo CD creates app pods or the policies (ADR 0013).
+  depends_on = [helm_release.argocd, helm_release.kyverno]
 }

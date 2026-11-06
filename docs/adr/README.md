@@ -18,3 +18,4 @@ Start new records from [the template](0000-template.md).
 | [0010](0010-plan-on-push-manual-apply.md) | Plan on push, apply and destroy only by manual dispatch | Accepted |
 | [0011](0011-eks-addon-ordering-in-dependency-graph.md) | Express EKS add-on ordering in the dependency graph | Accepted |
 | [0012](0012-trivy-gate-and-cosign-keyless-signing.md) | Gate images with Trivy before push and sign them with Cosign keyless | Accepted |
+| [0013](0013-kyverno-engine-by-terraform-policies-by-gitops.md) | Install Kyverno with Terraform and deliver its policies with Argo CD | Proposed |

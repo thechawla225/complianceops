@@ -1,0 +1,18 @@
+# Kyverno chart 3.9.2 overrides. Chart defaults already set requests/limits and a hardened securityContext
+# on every controller, 1 replica each, and the pre-delete webhook cleanup hook.
+
+# Cleanup policies aren't used here; one pod fewer on small nodes
+cleanupController:
+  enabled: false
+
+config:
+  webhooks:
+    # The chart's default excludes kube-system (the kyverno namespace is always excluded). Also skip argocd:
+    # policies only target sanctions-platform, and Argo CD must never be blocked by its own guardrails.
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - argocd

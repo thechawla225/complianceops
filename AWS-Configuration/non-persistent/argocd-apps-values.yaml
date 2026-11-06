@@ -1,3 +1,21 @@
+# Kyverno policies (ADR 0013). Outside gitops/*, so the ApplicationSet below doesn't pick the folder up.
+# Policies are cluster-scoped; the namespace only satisfies the Application spec.
+applications:
+  policies:
+    namespace: argocd
+    project: default
+    source:
+      repoURL: https://github.com/thechawla225/complianceops.git
+      targetRevision: main
+      path: policies
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: kyverno
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+
 applicationsets:
   services:
     namespace: argocd
