@@ -148,6 +148,9 @@ sequenceDiagram
 
 ## 7. Deployment View
 
+> **Target design.** Not all of this is built yet (for example, only `dev` exists, CI is GitHub Actions, and
+> Kyverno and secrets are Phase 07 work in progress). The README and `docs/adr/` record what is actually built.
+
 ```mermaid
 graph TB
     subgraph AWS["AWS (single account, single region)"]
@@ -170,7 +173,7 @@ graph TB
             SQS[[SQS]]
         end
         ECR[ECR — signed images only]
-        VAULT[Vault + External Secrets Operator]
+        VAULT[AWS Secrets Manager + External Secrets Operator]
     end
     CI[GitLab CI / Jenkins] -->|"lint → test → Trivy scan → Cosign sign"| ECR
     ECR -->|"image update"| ARGO
@@ -189,8 +192,8 @@ graph TB
 | Continuous integration | Dual pipelines (GitLab CI and Jenkins, one per service repo): lint → test → build → Trivy scan → Cosign sign → push to ECR |
 | Continuous deployment | ArgoCD Applications per service per environment; image-update automation triggers a sync on a new signed image — no manual `kubectl apply` |
 | Environments | `dev`, `staging`, `prod` namespaces on one cluster, parameterized Helm charts / Kustomize overlays per environment |
-| Policy enforcement | Kyverno admission policies (15+): no root containers, mandatory resource limits, images from ECR only, owner/team labels required |
-| Secrets | Vault + External Secrets Operator; no credential lives in a plaintext Kubernetes `Secret` or pipeline variable |
+| Policy enforcement | *(Phase 07, in progress)* Kyverno admission policies: no root containers, mandatory resource limits, images from ECR only, owner/team labels required |
+| Secrets | *(Phase 07, in progress)* AWS Secrets Manager + External Secrets Operator (IRSA); no credential lives in a plaintext Kubernetes `Secret` or pipeline variable |
 | Observability | kube-prometheus-stack + Loki; a Grafana dashboard for policy pass/fail rate, deployment frequency, and an audited-deployments table |
 | Cost visibility | Infracost wired into the Terraform pipeline, surfacing cost delta on every PR |
 
@@ -231,7 +234,9 @@ Real MT103 messages carry 20+ conditionally-present fields; full SWIFT complianc
 
 ### 8.4 Security
 
-Non-root containers, mandatory resource limits, and images-from-ECR-only are enforced by Kyverno at admission time, not by convention. Every image is Trivy-scanned and Cosign-signed in CI; Cosign signature verification is re-checked at admission. Every credential lives in Vault, synced into the cluster by External Secrets Operator.
+**Built:** every image is Trivy-scanned and Cosign-signed (keyless) in CI (ADR 0012). Containers run as non-root with resource limits and default-deny NetworkPolicies, set in the charts and Terraform.
+
+**In progress (Phase 07, ADR 0013):** Kyverno enforces non-root, mandatory resource limits, no `latest` tags and images-from-ECR-only at admission time instead of by convention, and re-checks the Cosign signature at admission. Credentials move to AWS Secrets Manager, synced into the cluster by External Secrets Operator with IRSA.
 
 ### 8.5 Testing strategy
 
@@ -320,7 +325,7 @@ Quality
 | No real BIC directory validation | BICs are checked for shape (8/11 alphanumeric chars) only, never resolved against an actual SWIFT BIC directory. |
 | Watchlist is a toy dataset | `watchlist.json` is a small, seeded, mock list — not a production sanctions-list feed (e.g. no live OFAC integration). |
 | Single region, no cross-region DR | Recovery drills cover node failure and etcd restore, not a full regional outage. |
-| Vault runs in dev mode | Sufficient to demonstrate the External Secrets Operator pattern; not a hardened, unsealed-with-Shamir-keys production Vault setup. |
+| Secrets Manager instead of Vault (Phase 07, planned) | Managed, cheap and no extra pods, with IRSA instead of a Vault auth method. Trade-off: if Terraform generates a secret's value, the value also sits in Terraform state (encrypted S3), so state access must stay restricted. |
 | Cost-driven teardown | Infrastructure is destroyed between build sessions, so this environment does not run continuously the way a real production platform would. |
 
 ---
