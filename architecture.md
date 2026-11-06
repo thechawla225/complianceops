@@ -325,7 +325,7 @@ Quality
 | No real BIC directory validation | BICs are checked for shape (8/11 alphanumeric chars) only, never resolved against an actual SWIFT BIC directory. |
 | Watchlist is a toy dataset | `watchlist.json` is a small, seeded, mock list — not a production sanctions-list feed (e.g. no live OFAC integration). |
 | Single region, no cross-region DR | Recovery drills cover node failure and etcd restore, not a full regional outage. |
-| Secrets Manager instead of Vault (Phase 07, planned) | Managed, cheap and no extra pods, with IRSA instead of a Vault auth method. Trade-off: if Terraform generates a secret's value, the value also sits in Terraform state (encrypted S3), so state access must stay restricted. |
+| Secrets Manager instead of Vault (Phase 07, in progress, ADR 0015) | Managed, cheap and no Vault pods, with IRSA instead of a Vault auth method. The value is generated ephemerally and written write-only, so it is not in Terraform state. Remaining exposure: the synced Kubernetes Secret (base64, guarded by namespace RBAC), AWS-managed key instead of a customer-managed one, and manual rotation. |
 | Cost-driven teardown | Infrastructure is destroyed between build sessions, so this environment does not run continuously the way a real production platform would. |
 
 ---

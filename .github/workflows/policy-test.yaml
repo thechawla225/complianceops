@@ -1,10 +1,12 @@
 name: Policy test
 
-# Tests the Kyverno policies offline (no cluster, no AWS), in two ways:
+# Tests the Kyverno policies without a cluster. Job policy-test (no AWS) works two ways:
 #  1. kyverno test: every policy against good and bad resources with declared expected results (tests/policies/).
 #  2. kyverno apply: every real chart, rendered with values-dev.yaml, must pass every policy. This is what makes
-#     switching a policy from Audit to Deny safe.
-# Meant to be a required status check ("policy-test"), so it runs on every PR: no path filters.
+#     switching a policy from Audit to Deny safe. verify-image-signatures is left out: it needs the private ECR.
+# Job signatures (AWS OIDC, ECR read) runs cosign verify on every image values-dev.yaml deploys, against the identity
+# verify-image-signatures trusts. It uses the infra CI role (ADR 0009), like the Terraform plan on PRs.
+# Meant to be required status checks ("policy-test", "signatures"), so they run on every PR: no path filters.
 on:
   pull_request:
   push:
@@ -48,7 +50,12 @@ jobs:
             # Release name = folder name, as the ApplicationSet does
             helm template "$name" "$d" -f "$d/values-dev.yaml" >> "$rendered"
           done
-          out=$(kyverno apply policies/ --resource "$rendered" --values-file tests/policies/values.yaml 2>&1) || true
+          # verify-image-signatures needs the private ECR; the signatures job below checks those instead
+          policies=()
+          for p in policies/*.yaml; do
+            [ "$p" = policies/verify-image-signatures.yaml ] || policies+=("$p")
+          done
+          out=$(kyverno apply "${policies[@]}" --resource "$rendered" --values-file tests/policies/values.yaml 2>&1) || true
           echo "$out"
           # Fail on any fail/error, and on zero passes (a selector mismatch would skip everything and look green)
           summary=$(echo "$out" | grep -E 'pass: [0-9]+, fail: [0-9]+' | tail -1)
@@ -63,3 +70,36 @@ jobs:
           if [ "$pass" -eq 0 ]; then
             echo "::error::no policy passed on any chart: check the namespace selector values"; exit 1
           fi
+
+  # Every image Git deploys (values-dev.yaml) must be signed by the identity verify-image-signatures.yaml trusts.
+  # Catches "Git points at an unsigned image" before any cluster exists. Same cosign as the signing workflow.
+  signatures:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # AWS OIDC, to read the private ECR
+      contents: read
+    env:
+      AWS_REGION: us-west-2
+      REGISTRY: 697961193772.dkr.ecr.us-west-2.amazonaws.com
+      IDENTITY: https://github.com/thechawla225/complianceops/.github/workflows/service-image.yaml@refs/heads/main
+      ISSUER: https://token.actions.githubusercontent.com
+    steps:
+      - uses: actions/checkout@v7
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: sigstore/cosign-installer@v4.1.2   # same as service-image.yaml
+      - name: cosign verify every deployed image
+        run: |
+          for svc in gateway transaction screening notifier; do
+            tag=$(sed -nE 's/^  tag: "([^"]+)".*/\1/p' "gitops/$svc/values-dev.yaml" | head -1)
+            [ -n "$tag" ] || { echo "::error::no tag in gitops/$svc/values-dev.yaml"; exit 1; }
+            image="$REGISTRY/complianceops-$svc:$tag"
+            echo "::group::$image"
+            cosign verify --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" "$image" > /dev/null \
+              || { echo "::error::$image is not signed by $IDENTITY"; exit 1; }
+            echo "verified: $image"
+            echo "::endgroup::"
+          done

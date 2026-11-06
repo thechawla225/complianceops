@@ -75,5 +75,8 @@ repos:
             [ -f "$d/Chart.yaml" ] || continue;
             echo "validating $d";
             helm template "$d" -f "$d/values-dev.yaml" \
-              | kubeconform -strict -summary -kubernetes-version 1.35.0 -;
+              | kubeconform -strict -summary -kubernetes-version 1.35.0 \
+                  -schema-location default \
+                  -schema-location "https://raw.githubusercontent.com/datreeio/CRDs-catalog/c86448cbf1a840ca62d119259864863897c8748a/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json" -;
           done'
+        # Second schema location: CRD schemas (External Secrets in gitops/postgres), pinned to a catalog commit
