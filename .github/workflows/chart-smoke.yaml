@@ -21,7 +21,7 @@ jobs:
       - uses: helm/kind-action@v1.15.1
         with:
           version: v0.33.0
-      - name: Namespace and the Secret Terraform creates on EKS
+      - name: Namespace and the Secret External Secrets builds on EKS (kind has no External Secrets)
         run: |
           kubectl create namespace sanctions-platform
           kubectl -n sanctions-platform create secret generic postgres-credentials \
@@ -29,7 +29,8 @@ jobs:
       - name: Install postgres and redis (fails if pods don't become Ready)
         run: |
           for c in postgres redis; do
-            helm install "$c" "gitops/$c" -f "gitops/$c/values-dev.yaml" \
+            # externalSecret is a postgres value (redis ignores it); on kind the Secret above stands in for it
+            helm install "$c" "gitops/$c" -f "gitops/$c/values-dev.yaml" --set externalSecret.enabled=false \
               -n sanctions-platform --wait --timeout 3m
           done
       - name: Prove they work, not just that probes pass

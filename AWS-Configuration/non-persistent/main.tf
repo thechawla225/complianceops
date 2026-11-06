@@ -188,23 +188,8 @@ resource "kubernetes_namespace" "sanctions_platform" {
   depends_on = [time_sleep.eks_access_propagation]
 }
 
-// Dev Postgres credentials (gitops/postgres + transaction). Generated here so no password is in Git;
-// Vault + External Secrets replace this in Phase 07. No special chars: it's embedded in a URL.
-resource "random_password" "postgres" {
-  length  = 32
-  special = false
-}
-
-resource "kubernetes_secret" "postgres_credentials" {
-  metadata {
-    name      = "postgres-credentials"
-    namespace = kubernetes_namespace.sanctions_platform.metadata[0].name
-  }
-  data = {
-    POSTGRES_PASSWORD = random_password.postgres.result
-    DATABASE_URL      = "postgresql+asyncpg://complianceops:${random_password.postgres.result}@postgres.sanctions-platform.svc.cluster.local:5432/complianceops"
-  }
-}
+// Dev Postgres credentials: Secrets Manager (persistent/secrets.tf) synced by External Secrets Operator
+// (external-secrets.tf, gitops/postgres/templates/externalsecret.yaml). No password in Terraform state (ADR 0015).
 
 resource "kubernetes_service_account" "sanctions_platform_sa" {
   metadata {

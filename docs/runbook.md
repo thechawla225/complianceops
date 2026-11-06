@@ -41,6 +41,14 @@ $p = kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.dat
 ```
 Open https://localhost:8080 and log in as `admin`.
 
+## Rotate the dev Postgres password
+1. In `AWS-Configuration/persistent/secrets.tf`, bump `postgres_password_version` (1 -> 2) and merge.
+2. Run Terraform Apply (persistent). Secrets Manager generates a new password; it never appears in state or the plan.
+3. External Secrets picks it up within `refreshInterval` (1h). To apply it now:
+   `kubectl -n sanctions-platform annotate externalsecret postgres-credentials force-sync=$(date +%s) --overwrite`
+4. Restart both consumers: `kubectl -n sanctions-platform rollout restart deploy/postgres deploy/transaction`.
+   Dev data is an emptyDir, so Postgres re-initialises with the new password.
+
 ## Troubleshooting
 | Symptom | Check | Fix |
 |---|---|---|
@@ -51,3 +59,4 @@ Open https://localhost:8080 and log in as `admin`.
 | Apply fails with `namespaces is forbidden` | Access entry not propagated yet | Handled by `time_sleep.eks_access_propagation` (30 s); if it recurs, re-run apply and raise the duration. |
 | Destroy fails with `Unauthorized` | EKS token expired mid-run (~15 min) | Re-run destroy; it continues where it stopped. |
 | Apply fails with `AlreadyExists` | Leftovers from a cancelled run, not in state | Find and delete them (cluster, NAT, EIP, KMS alias, log group, VPC), then re-run. Never cancel an apply mid-run. |
+| postgres `CreateContainerConfigError`: secret "postgres-credentials" not found | `kubectl -n sanctions-platform get externalsecret,secretstore` (READY / STATUS) | On first boot it appears within seconds. If the store isn't Ready: the External Secrets IRSA role or the secret name (`complianceops/dev/postgres`, created by persistent). |

@@ -1,0 +1,62 @@
+# Our images must carry a valid Cosign keyless signature made by the hub's reusable service-image workflow on main
+# (the only place images are built, scanned and pushed: ADR 0012). Signing is only half of supply-chain security;
+# this is the other half. Unsigned images, or images signed by any other identity, fail.
+# Postgres and redis aren't matched: they're allow-listed by digest in restrict-image-registries.yaml.
+# Not covered by the offline CI tests (signatures live in private ECR); proven on EKS (Phase 07.6, ADR 0014).
+# Audit first: switch to Deny once proven on the cluster.
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-image-signatures
+  annotations:
+    policies.kyverno.io/title: Verify image signatures
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      complianceops images must be signed (Cosign keyless) by the complianceops service-image workflow on main.
+spec:
+  validationActions: [Audit]
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: sanctions-platform
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  autogen:
+    podControllers:
+      controllers: [deployments]
+  matchImageReferences:
+    - glob: "697961193772.dkr.ecr.us-west-2.amazonaws.com/complianceops-*"
+  # The admission controller logs in to ECR with its IRSA role (kyverno-ecr.tf)
+  credentials:
+    providers: [amazon]
+  validationConfigurations:
+    # Don't rewrite tags to digests: Argo CD would see the live Deployment differ from Git and stay OutOfSync
+    mutateDigest: false
+    # Charts reference immutable commit-SHA tags, not digests (ADR 0006); requiring digests would fail every image.
+    # Safe because the ECR repos are IMMUTABLE: a tag can never be moved to a different image.
+    verifyDigest: false
+    required: true
+  # Admission only: background scans would need ECR credentials in the reports controller too
+  evaluation:
+    background:
+      enabled: false
+  attestors:
+    - name: serviceImageWorkflow
+      cosign:
+        keyless:
+          identities:
+            # The certificate's identity is the reusable workflow that signed, not the calling service repo
+            - issuer: https://token.actions.githubusercontent.com
+              subject: https://github.com/thechawla225/complianceops/.github/workflows/service-image.yaml@refs/heads/main
+        # Public Sigstore (Fulcio + Rekor), as used by cosign in CI
+        ctlog:
+          url: https://rekor.sigstore.dev
+  validations:
+    - expression: >-
+        images.containers.map(image, verifyImageSignatures(image, [attestors.serviceImageWorkflow])).all(e, e > 0)
+      message: >-
+        Image is not signed by the complianceops service-image workflow on main
+        (Cosign keyless, issuer token.actions.githubusercontent.com).

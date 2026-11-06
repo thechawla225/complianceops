@@ -9,8 +9,17 @@ image:
 
 database: complianceops
 user: complianceops
-# Created by Terraform (non-persistent/main.tf: kubernetes_secret.postgres_credentials)
+# Built by External Secrets Operator from AWS Secrets Manager (templates/externalsecret.yaml, ADR 0015).
+# The transaction chart reads DATABASE_URL from the same Secret.
 existingSecretName: postgres-credentials
+
+# Off by default so the chart installs where External Secrets isn't present (CI's kind smoke test creates the Secret
+# itself); on in dev (values-dev.yaml).
+externalSecret:
+  enabled: false
+  region: us-west-2
+  remoteKey: complianceops/dev/postgres   # persistent/secrets.tf
+  refreshInterval: 1h
 
 port: 5432
 

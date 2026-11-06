@@ -13,6 +13,12 @@ resource "helm_release" "kyverno" {
   timeout          = 600
   values           = [file("${path.module}/kyverno-values.yaml")]
 
+  // IRSA: the admission controller reads image signatures from ECR (kyverno-ecr.tf, ADR 0014)
+  set = [{
+    name  = "admissionController.rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.kyverno_ecr.arn
+  }]
+
   // Same ordering as Argo CD. argocd_apps depends on this too, so the webhook is up before any app pod is created;
   // on destroy the apps go first, then Kyverno (its pre-delete hook removes the webhooks).
   depends_on = [time_sleep.eks_access_propagation]
