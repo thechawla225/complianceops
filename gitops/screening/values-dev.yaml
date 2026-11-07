@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  tag: "4329806"  # complianceops-screeningservice commit
+  tag: "5d97714"  # complianceops-screeningservice commit
 
 env:
   REDIS_ADDR: "redis.sanctions-platform.svc.cluster.local:6379"
