@@ -29,5 +29,11 @@ resource "helm_release" "argocd_apps" {
   // CRDs and the ApplicationSet controller come from the argocd release; destroy removes this first.
   // Kyverno too: its webhook must be up before Argo CD creates app pods or the policies (ADR 0013).
   // External Secrets too: its CRDs must exist before Argo CD syncs gitops/postgres's ExternalSecret (ADR 0015).
-  depends_on = [helm_release.argocd, helm_release.kyverno, helm_release.external_secrets]
+  // kube-prometheus-stack too: the charts' ServiceMonitor/PodMonitor CRDs (ADR 0016).
+  depends_on = [
+    helm_release.argocd,
+    helm_release.kyverno,
+    helm_release.external_secrets,
+    helm_release.kube_prometheus_stack,
+  ]
 }

@@ -1,0 +1,17 @@
+{{- /* Tells Prometheus to scrape this service's /metrics (Phase 08.1) through its Service. Needs the
+       monitoring.coreos.com CRDs from kube-prometheus-stack (ADR 0016). */ -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "screening.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "screening.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "screening.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

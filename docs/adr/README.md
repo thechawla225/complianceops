@@ -21,3 +21,4 @@ Start new records from [the template](0000-template.md).
 | [0013](0013-kyverno-engine-by-terraform-policies-by-gitops.md) | Install Kyverno with Terraform and deliver its policies with Argo CD | Proposed |
 | [0014](0014-verify-cosign-signatures-at-admission.md) | Verify Cosign signatures at admission against the signing workflow's identity | Proposed |
 | [0015](0015-secrets-manager-and-external-secrets.md) | Keep secrets in AWS Secrets Manager, out of Terraform state, synced by External Secrets Operator | Proposed |
+| [0016](0016-self-hosted-prometheus-loki-alloy.md) | Self-host metrics and logs: kube-prometheus-stack, Loki and Alloy, installed by Terraform | Proposed |

@@ -1,0 +1,76 @@
+# kube-prometheus-stack chart 92.22.0 overrides (ADR 0016). Sized for 2 small nodes; storage is emptyDir (chart default).
+
+# EKS runs the control plane for us: etcd, the scheduler and the controller-manager can't be scraped, and kube-proxy
+# binds its metrics to 127.0.0.1. Left on, they show as permanently "down" targets and fire alerts from day one.
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    # By default Prometheus only selects ServiceMonitors/PodMonitors/rules labelled release=kube-prometheus-stack.
+    # Ours live in the service charts, so select them all instead of silently ignoring them.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    retention: 2d # the cluster is destroyed after every session anyway
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+
+grafana:
+  # No adminPassword here: the chart generates a random one into a Kubernetes Secret, so it's never in Git or in
+  # Terraform state. Reach Grafana with kubectl port-forward (runbook); no LoadBalancer.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 384Mi
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      access: proxy
+      url: http://loki.monitoring.svc:3100
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 192Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
