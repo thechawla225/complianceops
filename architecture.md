@@ -194,7 +194,7 @@ graph TB
 | Environments | `dev`, `staging`, `prod` namespaces on one cluster, parameterized Helm charts / Kustomize overlays per environment |
 | Policy enforcement | *(Phase 07, in progress)* Kyverno admission policies: no root containers, mandatory resource limits, images from ECR only, owner/team labels required |
 | Secrets | *(Phase 07, in progress)* AWS Secrets Manager + External Secrets Operator (IRSA); no credential lives in a plaintext Kubernetes `Secret` or pipeline variable |
-| Observability | kube-prometheus-stack + Loki; a Grafana dashboard for policy pass/fail rate, deployment frequency, and an audited-deployments table |
+| Observability | *(Phase 08, in progress)* Services expose Prometheus RED metrics at `/metrics` (built). kube-prometheus-stack + Loki + Alloy installed by Terraform, ServiceMonitors in the charts (ADR 0016, not yet run on EKS); planned: a Grafana dashboard for policy pass/fail rate, deployment frequency, and an audited-deployments table |
 | Cost visibility | Infracost wired into the Terraform pipeline, surfacing cost delta on every PR |
 
 ---

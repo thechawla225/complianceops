@@ -1,0 +1,57 @@
+# Loki chart 7.5.0 overrides (ADR 0016). Single binary: one pod does ingest, storage and queries.
+# The distributed modes need ~3x the memory and only pay off at volumes this project will never reach.
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false # single tenant; otherwise every push and query needs an X-Scope-OrgID header
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem # chunks and index on the pod's local volume, no object store
+  schemaConfig:
+    configs:
+      - from: "2026-11-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+
+singleBinary:
+  replicas: 1
+  # emptyDir instead of a PVC: logs go with the cluster on teardown, and no EBS volume is left behind billing
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# Zero the other deployment modes' components
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+# Extras a single small instance doesn't need: an nginx gateway, memcached caches, a canary and Helm test pod
+gateway:
+  enabled: false
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+lokiCanary:
+  enabled: false
+test:
+  enabled: false
+
+# The rules sidecar loads Loki alert rules from ConfigMaps/Secrets, and the chart gives it read access to every
+# Secret in the cluster to do so. Log alerting isn't used (alerts come from Prometheus), so drop both.
+sidecar:
+  rules:
+    enabled: false

@@ -1,0 +1,67 @@
+# Alloy chart 1.15.0 overrides (ADR 0016). Alloy replaces Promtail (end of life March 2026).
+# One replica reads every pod's logs through the Kubernetes API (loki.source.kubernetes), so it needs no hostPath
+# mounts of the nodes' /var/log. At this size the API load is negligible; a large cluster would run a DaemonSet that
+# tails the node's own log files instead.
+controller:
+  type: deployment
+  replicas: 1
+
+alloy:
+  configMap:
+    content: |
+      // Find every pod in the cluster
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      // Keep a small, fixed set of labels: namespace, pod, container, app (high-cardinality labels hurt Loki too)
+      discovery.relabel "pods" {
+        targets = discovery.kubernetes.pods.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "container"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+          target_label  = "app"
+        }
+      }
+
+      loki.source.kubernetes "pods" {
+        targets    = discovery.relabel.pods.output
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki.monitoring.svc:3100/loki/api/v1/push"
+        }
+      }
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# Least privilege: the chart's default role can also read every Secret and ConfigMap in the cluster.
+# Log collection only needs to list pods and read their logs. (The chart's cluster-only rules, read access to nodes
+# and /metrics, are kept: the chart can't render an empty list there, and they expose no secrets.)
+rbac:
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "pods/log", "namespaces"]
+      verbs: ["get", "list", "watch"]
+
+# The PodLogs CRD isn't used
+crds:
+  create: false

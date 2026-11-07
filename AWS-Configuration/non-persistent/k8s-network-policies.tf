@@ -84,6 +84,18 @@ resource "kubernetes_network_policy" "transaction" {
       }
       ports { port = 8000 }
     }
+    # Prometheus scrapes /metrics (ADR 0016). One from block = namespace AND pod: only Prometheus, only from monitoring
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = { "kubernetes.io/metadata.name" = "monitoring" }
+        }
+        pod_selector {
+          match_labels = { "app.kubernetes.io/name" = "prometheus" }
+        }
+      }
+      ports { port = 8000 }
+    }
     egress {
       to {
         pod_selector {
@@ -156,6 +168,18 @@ resource "kubernetes_network_policy" "screening" {
       }
       ports { port = 8002 }
     }
+    # Prometheus scrapes /metrics (ADR 0016). One from block = namespace AND pod: only Prometheus, only from monitoring
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = { "kubernetes.io/metadata.name" = "monitoring" }
+        }
+        pod_selector {
+          match_labels = { "app.kubernetes.io/name" = "prometheus" }
+        }
+      }
+      ports { port = 8002 }
+    }
     egress {
       to {
         pod_selector {
@@ -199,7 +223,19 @@ resource "kubernetes_network_policy" "notifier" {
     pod_selector {
       match_labels = { app = "notifier" }
     }
-    policy_types = ["Egress"]
+    policy_types = ["Ingress", "Egress"]
+    # Prometheus scrapes /metrics (ADR 0016). One from block = namespace AND pod: only Prometheus, only from monitoring
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = { "kubernetes.io/metadata.name" = "monitoring" }
+        }
+        pod_selector {
+          match_labels = { "app.kubernetes.io/name" = "prometheus" }
+        }
+      }
+      ports { port = 8003 }
+    }
     egress {
       to {
         ip_block {

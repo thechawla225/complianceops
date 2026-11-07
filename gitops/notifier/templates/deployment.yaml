@@ -30,9 +30,10 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
-            # Exists only for the kubelet's own liveness/readiness probes
-            # below — there's deliberately no Service in front of this
-            # (see values.yaml). Not reachable from other pods.
+            # For the kubelet's liveness/readiness probes below and for
+            # Prometheus (PodMonitor, /metrics). There's deliberately no
+            # Service in front of this (see values.yaml); the only pods allowed
+            # in are Prometheus's (notifier-policy NetworkPolicy).
             - name: http
               containerPort: {{ .Values.healthPort }}
               protocol: TCP
