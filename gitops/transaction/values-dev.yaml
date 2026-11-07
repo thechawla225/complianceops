@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  tag: "94ba412"  # complianceops-transactionservice commit
+  tag: "4a51b7b"  # complianceops-transactionservice commit
 
 env:
   SCREENING_SERVICE_URL: "http://screening.sanctions-platform.svc.cluster.local:8002"
